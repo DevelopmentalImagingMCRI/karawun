@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+import os
+import karawun
+import argparse
+
+
+def is_readable_file(parser, arg):
+    try:
+        f=open(arg, 'r')
+        f.close()
+    except:
+        raise argparse.ArgumentTypeError("{0} does not exist or is not readable".format(arg))
+    
+    return(arg)
+
+parser = argparse.ArgumentParser(description=
+                                 "A tool for creating Brainlab compatible dicom data from "
+                                 "mrtrix tract files and nifti images. All image and tck"
+                                 "files are assumed to be aligned and will be placed into"
+                                 "a dicom frame of reference with the first nifti image"
+                                 "as the base for the reference. The alignment must be"
+                                 "accepted in brainlab before objects can be viewed on"
+                                 "all images.")
+
+parser.add_argument("-d", "--dicom-template",
+                    type=lambda x: is_readable_file(parser, x),
+                    required=True,
+                    help="Dicom file to supply tags, ideally from one "
+                         "of the dicoms converted to nifti")
+
+parser.add_argument("-o", "--output-dir", type=str, required=True,
+                    help="Output directory for generated dicom")
+
+parser.add_argument("-n", "--nifti", nargs="+", 
+                    type=lambda x: is_readable_file(parser, x),
+                    required=True,
+                    help="One or more input nifti files")
+
+parser.add_argument("-t", "--tract-files", nargs="+",
+                    type=lambda x: is_readable_file(parser, x),                    
+                    required=False,
+                    help="One or more mrtrix streamline files")
+                    
+
+def run_cli(args):
+    karawun.import_tractography_study(origdcm=args.dicom_template,
+                                      niftifiles=args.nifti,
+                                      tckfiles=args.tract_files,
+                                      destdir=args.output_dir)
+
+if __name__ == '__main__':
+    args=parser.parse_args()
+    run_cli(args)
