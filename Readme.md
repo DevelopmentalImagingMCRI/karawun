@@ -139,3 +139,7 @@ the dicom files created on your system are identical to those created
 on the development system. The test destination is displayed as the
 test is run.
 
+# Licensing
+
+_Karawun_ is distributed under the Apache License 2.0
+
