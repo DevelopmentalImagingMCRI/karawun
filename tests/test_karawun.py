@@ -88,6 +88,7 @@ def test_conv1(dcm_uuid, localtime, tmp_path):
     assert os.path.exists(baselineshaf),\
         ("Missing json file - run pytest --runcreatebaseline"
          "-k 'not test_conv1'")
+    print("Destination folder = " + str(tmp_path))
     converter(tmp_path)
     this_sha512 = get_all_sha512(tmp_path)
     f = open(baselineshaf)
