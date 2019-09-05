@@ -114,7 +114,7 @@ dicoms from which the nifti were derived. Always treat the images
 derived from the external workup as a new and independent set of data.
 
 We anonymise dicoms before import to Brainlab (using
-(gdcm)[https://sourceforge.net/p/gdcm/gdcm/]) to avoid any chance of
+[gdcm](https://sourceforge.net/p/gdcm/gdcm/) ) to avoid any chance of
 overwriting other patient data. In theory, copying tags from an
 original dicom will make the converted dicoms appear to derive from
 the correct patient. Please test very thoroughly before relying on
@@ -123,7 +123,7 @@ this facility.
 ## Longer
 install, with testing (recommended)
 
-1. Create and activate an environment, as above, then (download the package sources)[https://github.com/DevelopmentalImagingMCRI/karawun/archive/master.zip] or fetch via git:
+1. Create and activate an environment, as above, then [download the package sources](https://github.com/DevelopmentalImagingMCRI/karawun/archive/master.zip) *OR* fetch via git:
     ```bash
     git clone https://github.com/DevelopmentalImagingMCRI/karawun.git
     ```
