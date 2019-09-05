@@ -32,25 +32,24 @@ with miniconda is illustrated below:
 1. [Install miniconda for python 3.7](https://docs.conda.io/en/latest/miniconda.html)
 
 1. Add package channels:
-```bash
-conda config --append channels conda-forge anaconda SimpleITK
-```
-
+    ```bash
+    conda config --append channels conda-forge \
+    --append channels anaconda \
+    --append channels SimpleITK
+    ```
 1. Create a conda environment (using a name of your own choice):
-```bash
-conda create --name MyEnv
-conda install --name MyEnv pip
-```
-
+    ```bash
+    conda create --name KarawunEnv
+    conda install --name KarawunEnv pip
+    ```
 1. Activate the environment:
-```bash
-conda activate MyEnv
-```
-
+    ```bash
+    conda activate KarawunEnv
+    ```
 1. Install _karawun_ (internet access required)
-```bash
-pip install git+https://github.com/DevelopmentalImagingMCRI/karawun.git@master#egg=karawun
-```
+    ```bash
+    pip install git+https://github.com/DevelopmentalImagingMCRI/karawun.git@master#egg=karawun
+    ```
 
 See below for recommended testing procedure.
 
@@ -118,20 +117,20 @@ this facility.
 ## Longer
 install, with testing (recommended)
 
-1. Create and activate an environment, as above, then (download the package sources)[zip link] or fetch via git:
-```bash
-git clone https://github.com/DevelopmentalImagingMCRI/karawun.git
-```
+1. Create and activate an environment, as above, then (download the package sources)[https://github.com/DevelopmentalImagingMCRI/karawun/archive/master.zip] or fetch via git:
+    ```bash
+    git clone https://github.com/DevelopmentalImagingMCRI/karawun.git
+    ```
 1. Install the dependencies
-```bash
-cd karawun
-conda install --name MyEnv --file requirements.txt
-```
+    ```bash
+    cd karawun
+    conda install --name KarawunEnv --file requirements.txt
+    ```
 
 1. Run the test:
-```bash
-python -m pytest -s tests/
-```
+    ```bash
+    python -m pytest -s tests/
+    ```
 
 This test uses some data distributed with the package. A successful
 result is indicated by 1 passed and 1 skipped test. Success means that
