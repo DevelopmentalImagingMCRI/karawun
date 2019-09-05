@@ -120,8 +120,7 @@ original dicom will make the converted dicoms appear to derive from
 the correct patient. Please test very thoroughly before relying on
 this facility.
 
-## Longer
-install, with testing (recommended)
+## Longer install, with testing (recommended)
 
 1. Create and activate an environment, as above, then [download the package sources](https://github.com/DevelopmentalImagingMCRI/karawun/archive/master.zip) *OR* fetch via git:
     ```bash
@@ -143,6 +142,10 @@ result is indicated by 1 passed and 1 skipped test. Success means that
 the dicom files created on your system are identical to those created
 on the development system. The test destination is displayed as the
 test is run.
+
+# Problems/Requests
+
+Please use the github [issue tracker](https://github.com/DevelopmentalImagingMCRI/karawun/issues) to ask questions or report problems.
 
 # Licensing
 
