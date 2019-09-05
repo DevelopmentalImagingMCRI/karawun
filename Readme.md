@@ -37,10 +37,9 @@ with miniconda is illustrated below:
     --append channels anaconda \
     --append channels SimpleITK
     ```
-1. Create a conda environment (using a name of your own choice):
+1. Create a conda environment (using a name of your own choice) and install the dependencies:
     ```bash
-    conda create --name KarawunEnv
-    conda install --name KarawunEnv pip
+    conda create --name KarawunEnv --file https://github.com/DevelopmentalImagingMCRI/karawun/raw/master/requirements.txt
     ```
 1. Activate the environment:
     ```bash
@@ -48,8 +47,15 @@ with miniconda is illustrated below:
     ```
 1. Install _karawun_ (internet access required)
     ```bash
-    pip install git+https://github.com/DevelopmentalImagingMCRI/karawun.git@master#egg=karawun
+    pip install git+https://github.com/DevelopmentalImagingMCRI/karawun.git@master
     ```
+1. Test the installation by running the main script:
+    ```bash
+    importTractography -h
+    ```
+    This will produce the help information if the installation was successful.
+
+Subsequent uses of karawun only require the `conda activate KarawunEnv` step.
 
 See below for recommended testing procedure.
 
