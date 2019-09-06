@@ -2,7 +2,7 @@
 
 ## Introduction
 
-_Karawun_ converts the results of a diffusion imaging tractography study,
+_Karawun_ converts the results of a diffusion MRI tractography study,
 as might be used for surgical planning, to a form that is readable by
 the Brainlab software suite.
 
@@ -85,7 +85,7 @@ which all volume images belong. Brainlab requires that the user accept
 this registration.
 
 The tract files are the mrtrix .tck files that need to be
-displayed/manipulated in Brainlab. The conversion of these files
+displayed in Brainlab. The conversion of these files
 creates the dicom fibre object format that can be viewed as a 3D
 object in Brainlab.
 
