@@ -154,4 +154,4 @@ _Karawun_ is distributed under the Apache License 2.0
 
 # Contributors
 
-Richard Beare, Joseph Yang, Andrew Perry.
+Richard Beare, Joseph Yang, Chris Adamson, Andrew Perry.
