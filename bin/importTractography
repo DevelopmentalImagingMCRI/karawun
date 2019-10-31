@@ -56,12 +56,18 @@ parser.add_argument("-t", "--tract-files", nargs="+",
                     type=lambda x: is_readable_file(parser, x),                    
                     required=False,
                     help="One or more mrtrix streamline files")
+
+parser.add_argument("-l", "--label-files", nargs="+",
+                    type=lambda x: is_readable_file(parser, x),                    
+                    required=False,
+                    help="One or more nifti label image files")
                     
 
 def run_cli(args):
     karawun.import_tractography_study(origdcm=args.dicom_template,
                                       niftifiles=args.nifti,
                                       tckfiles=args.tract_files,
+                                      labelfiles=args.label_files,
                                       destdir=args.output_dir)
 
 if __name__ == '__main__':
