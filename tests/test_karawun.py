@@ -90,7 +90,11 @@ def converter(targetd):
     MR = [os.path.join(test_data, "Tractography", nii) for nii in MR]
     TCK = ['Left_PT_final.tck', 'Right_PT_final.tck']
     TCK = [os.path.join(test_data, "Tractography", tck) for tck in TCK]
-    karawun.import_tractography_study(t1dcm, MR, TCK, targetd)
+    karawun.import_tractography_study(origdcm=t1dcm,
+                                      niftifiles=MR,
+                                      tckfiles=TCK,
+                                      labelfiles=None,
+                                      destdir=targetd)
 
 
 @mock.patch('time.localtime', side_effect=patchLocalTime)

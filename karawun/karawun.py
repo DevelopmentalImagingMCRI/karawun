@@ -35,7 +35,7 @@ import os.path
 import re
 import struct
 import glob
-
+from . import ciedicom
 #  Constants that brainlab uses in the streamline files - not sure
 #  if they are important or not
 
@@ -66,6 +66,12 @@ else:
     AlgorithmName = 'Fibertracking'
     ContentCreatorName = ""
     SeriesDescription = 'Fiber bundles'
+
+
+# Stuff to do with cie colours
+
+nice_colours_cie = [ciedicom.rgb2DicomLab(col) for
+                    col in ciedicom.nice_colours_rgb]
 
 # mrtrix tckfile stuff
 # converts the MIF datatypes
@@ -1052,9 +1058,8 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
         filenames.append(fname)
 
     return {'SOPlist': SOPlist, 'dcm': t1d,
-            'dcmfiles': filenames, 'spacing' : nif.GetSpacing(),
-            'size' : imsize, 'matrix' : oMatrix}
-            
+            'dcmfiles': filenames, 'spacing': nif.GetSpacing(),
+            'size': imsize, 'matrix': oMatrix}
 
 
 ##################################################################
@@ -1477,44 +1482,11 @@ def tck_to_dicom(tckfile, dicomfile, outputfile, seriesNum=0,
 
 
 def lookup_cie(labnum):
-    cie=[(0,0,0),
-         ( 35051,53459,50214 ),
-         ( 47132,14049,50992 ),
-         ( 21129,53153,5156 ),
-         ( 59644,20442,29223 ),
-         ( 39650,58070,17344 ),
-         ( 43906,44068,51913 ),
-         ( 23693,21716,43630 ),
-         ( 27681,50777,13708 ),
-         ( 20647,44065,39731 ),
-         ( 8479,45047,16256 ),
-         ( 36732,29399,48348 ),
-         ( 38722,52574,32169 ),
-         ( 25936,39249,38808 ),
-         ( 33109,25592,29933 ),
-         ( 36285,42319,44192 ),
-         ( 35285,52854,14454 ),
-         ( 33095,20388,40197 ),
-         ( 29449,51107,29069 ),
-         ( 30651,47552,47985 ),
-         ( 43064,23188,31239 ),
-         ( 29708,42107,18050 ),
-         ( 36816,54586,31521 ),
-         ( 34663,25688,34308 ),
-         ( 35060,40448,14184 ),
-         ( 33211,45430,42864 ),
-         ( 16334,50080,9364 ),
-         ( 21281,45087,32225 ),
-         ( 21439,48926,22993 ),
-         ( 45734,47360,23476 ),
-         ( 18510,45989,43551 ),
-         ( 63667,27405,57162 )
-    ]
-
-    if labnum > (len(cie) - 1):
-        labnum = len(cie1) - 1
+    global nice_colours_cie
+    if labnum > (len(nice_colours_cie) - 1):
+        labnum = len(nice_colours_cie) - 1
         print("Error - too many labels")
-    return list(cie[labnum])
+    return list(nice_colours_cie[labnum])
 
 
 def process_label_im(im):
@@ -1522,7 +1494,7 @@ def process_label_im(im):
     cropped in a special way. I can't see how to encode
     a separate image space for each label. Brainlab stores
     a single segmentation per file. We'll do the same.
-    
+
     Note that Brainlab can read multi-segmentations.
 
     Returns a dictionary of images and corresponding
@@ -1550,7 +1522,6 @@ def process_label_im(im):
     corners = [(x[0], x[1], x[2]) for x in boxes]
     sizes = [(x[3], x[4], x[5]) for x in boxes]
 
-
     newcorners = [list(x) for x in corners]
     newsizes = [list(x) for x in sizes]
 
@@ -1560,9 +1531,16 @@ def process_label_im(im):
 
     return({'rois': ims, 'labels': labels,
             'corners': corners,
-            'sizes' : sizes,
+            'sizes': sizes,
             'original': im})
 
+
+def count_total_frames(perlabelstuff, isoidx):
+    totalframes = 0
+    for l in range(len(perlabelstuff['rois'])):
+        sz = perlabelstuff['rois'][l].GetSize()
+        totalframes += sz[isoidx]
+    return totalframes
 
 
 def process_label_imA(im):
@@ -1639,6 +1617,7 @@ def process_label_imA(im):
     return({'rois': ims, 'labels': labels,
             'original': im, 'cropped': imcrop})
 
+
 def mk_shared_functional_group(nif, SOPList):
     """Create the orientation information that
     goes in the SharedFunctionalGroups sequence
@@ -1678,16 +1657,16 @@ def mk_shared_functional_group(nif, SOPList):
 
     for g in range(len(SOPList)):
         sis.append(mk_sis(SOPList[g]))
-        
+
     di.SourceImageSequence = sis
 
     dcs = pydi.Sequence()
     dc = pydi.Dataset()
-    dc.CodeValue  = '113076'
+    dc.CodeValue = '113076'
     dc.CodingSchemeDesignator = 'DCM'
     dc.CodeMeaning = 'Segmentation'
     dcs.append(dc)
-    
+
     di.DerivationCodeSequence = dcs
     dis = pydi.Sequence()
     dis.append(di)
@@ -1706,6 +1685,7 @@ def mk_shared_functional_group(nif, SOPList):
     sfg1.PixelMeasuresSequence = pms
     sfgs.append(sfg1)
     return(sfgs)
+
 
 def mk_uid_sublist(UIDlist, perlabelstuff, labelidx):
     """create a list of UIDs corresponding to the dicoms of
@@ -1728,10 +1708,10 @@ def mk_uid_sublist(UIDlist, perlabelstuff, labelidx):
     sizes = perlabelstuff["sizes"][labelidx]
     isocorner = corner[isoidx]
     isosize = sizes[isoidx]
-    
     return(UIDlist[isocorner:(isocorner+isosize)])
-    
-def mk_perframe_functional_group(perlabelstuff, labelidx, UIDlist):
+
+
+def mk_perframe_functional_group(perlabelstuff, UIDlist):
     """key section describing the per label, per slice
     image data that is later run length encoded
     :perlabelstuff: is the subsetted images/bounding boxes
@@ -1750,42 +1730,43 @@ def mk_perframe_functional_group(perlabelstuff, labelidx, UIDlist):
     # one frame content sequence per slice, per label
     lablist = perlabelstuff['labels']
 
-    label_id = lablist[labelidx]
+    for labelidx in range(len(lablist)):
+        label_id = lablist[labelidx]
 
-    this_roi = perlabelstuff['rois'][labelidx]
-    this_size = this_roi.GetSize()
-    this_slices = this_size[isoidx]
-    thiscropped = perlabelstuff["rois"][labelidx]
-    for thisslice in range(this_slices):
-        pffg1 = pydi.Dataset()
-        corner = [0, 0, 0]
-        corner[isoidx] = thisslice
-        origin = thiscropped.TransformIndexToPhysicalPoint(corner)
-        fcs = pydi.Sequence()
-        fc1 = pydi.Dataset()
-        fc1.DimensionIndexValues = [labelidx + 1, thisslice + 1]
-        fcs.append(fc1)
-        pps = pydi.Sequence()
-        pp1 = pydi.Dataset()
-        origin = str2ds(origin)
-        pp1.ImagePositionPatient = origin
+        this_roi = perlabelstuff['rois'][labelidx]
+        this_size = this_roi.GetSize()
+        this_slices = this_size[isoidx]
+        thiscropped = perlabelstuff["rois"][labelidx]
+        for thisslice in range(this_slices):
+            pffg1 = pydi.Dataset()
+            corner = [0, 0, 0]
+            corner[isoidx] = thisslice
+            origin = thiscropped.TransformIndexToPhysicalPoint(corner)
+            fcs = pydi.Sequence()
+            fc1 = pydi.Dataset()
+            fc1.DimensionIndexValues = [labelidx + 1, thisslice + 1]
+            fcs.append(fc1)
+            pps = pydi.Sequence()
+            pp1 = pydi.Dataset()
+            origin = str2ds(origin)
+            pp1.ImagePositionPatient = origin
 
-        pps.append(pp1)
+            pps.append(pp1)
 
-        sis = pydi.Sequence()
-        si1 = pydi.Dataset()
-        # only ever one segment per file
-        si1.ReferencedSegmentNumber = 1
-        sis.append(si1)
-        pffg1.PlanePositionSequence = pps
-        pffg1.FrameContentSequence = fcs
-        pffg1.SegmentIdentificationSequence = sis
-        pffgs.append(pffg1)
+            sis = pydi.Sequence()
+            si1 = pydi.Dataset()
+            # only ever one segment per file
+            si1.ReferencedSegmentNumber = labelidx + 1
+            sis.append(si1)
+            pffg1.PlanePositionSequence = pps
+            pffg1.FrameContentSequence = fcs
+            pffg1.SegmentIdentificationSequence = sis
+            pffgs.append(pffg1)
 
     return(pffgs)
 
 
-def mk_rle_data(perlabelstuff, labidx):
+def mk_rle_data(perlabelstuff):
     """
     Do the run length encoding and encapsulation of
     all labels. Note that the first byte array is
@@ -1800,16 +1781,18 @@ def mk_rle_data(perlabelstuff, labidx):
     otheridx.remove(isoidx)
     labelframe = list()
 
-    roi = perlabelstuff["rois"][labidx]
-    sz = roi.GetSize()
-    for slce in range(sz[isoidx]):
-        selector = mk_indexing_tuple(slce, isoidx)
-        roislice = roi[selector]
-        slicedat = sitk.GetArrayFromImage(roislice)
-        rledat = (pydi.pixel_data_handlers.
-                  rle_handler.rle_encode_frame(slicedat))
+    for labidx in range(len(perlabelstuff["rois"])):
+        roi = perlabelstuff["rois"][labidx]
+        sz = roi.GetSize()
+        for slce in range(sz[isoidx]):
+            selector = mk_indexing_tuple(slce, isoidx)
+            roislice = roi[selector]
+            slicedat = sitk.GetArrayFromImage(roislice)
+            rledat = (pydi.pixel_data_handlers.
+                      rle_handler.rle_encode_frame(slicedat))
 
-        labelframe.append(rledat)
+            labelframe.append(rledat)
+
     return(pydi.encaps.encapsulate(labelframe,
                                    fragments_per_frame=1, has_bot=True))
 
@@ -1822,81 +1805,85 @@ def find_match_im(labelfile, nidetails):
     spacing = nif.GetSpacing()
     oMatrix = nif.GetDirection()
     imsize = nif.GetSize()
+
     def within_tol(t1, t2):
         t1a = np.array(t1)
         t2a = np.array(t2)
         d = np.abs(t1a - t2a)
         return d.max() < 0.0001
-    
+
     for i in range(len(nidetails)):
         sp = nidetails[i]["spacing"]
         sz = nidetails[i]["size"]
         mt = nidetails[i]["matrix"]
-        if (within_tol(spacing, sp)
-            and within_tol(imsize, sz)
-            and within_tol(oMatrix, mt)):
+        if (within_tol(spacing, sp) and
+           within_tol(imsize, sz) and
+           within_tol(oMatrix, mt)):
             return i
     return None
 
 
-def mk_label_segment_sequence(imname, labnum):
+def mk_label_segment_sequence(imname, labs):
     """
     Hardcoded stuff indicating that the mask/labels are imported
     """
     segment_sequence = pydi.Sequence()
 
-    # Segment Sequence: Segment 1
-    seg1 = pydi.Dataset()
+    for labnum in range(len(labs)):
+        # Segment Sequence: Segment 1
+        seg1 = pydi.Dataset()
 
-    # Anatomic Region Sequence
-    anatomic_region_sequence = pydi.Sequence()
-    seg1.AnatomicRegionSequence = anatomic_region_sequence
-    
-    # Anatomic Region Sequence: Anatomic Region 1
-    anatomic_region1 = pydi.Dataset()
-    anatomic_region1.CodeValue = 'T-D0010'
-    anatomic_region1.CodingSchemeDesignator = 'SRT'
-    anatomic_region1.CodeMeaning = 'Entire body'
-    anatomic_region_sequence.append(anatomic_region1)
+        # Anatomic Region Sequence
+        anatomic_region_sequence = pydi.Sequence()
+        seg1.AnatomicRegionSequence = anatomic_region_sequence
 
-    # Segmented Property Category Code Sequence
-    seg_property_category_code_sequence = pydi.Sequence()
-    seg1.SegmentedPropertyCategoryCodeSequence = (
-        seg_property_category_code_sequence)
+        # Anatomic Region Sequence: Anatomic Region 1
+        anatomic_region1 = pydi.Dataset()
+        anatomic_region1.CodeValue = 'T-D0010'
+        anatomic_region1.CodingSchemeDesignator = 'SRT'
+        anatomic_region1.CodeMeaning = 'Entire body'
+        anatomic_region_sequence.append(anatomic_region1)
 
-    # Segmented Property Category Code Sequence:
-    # Segmented Property Category Code 1
-    seg_property_category_code1 = pydi.Dataset()
-    seg_property_category_code1.CodeValue = 'T-D000A'
-    seg_property_category_code1.CodingSchemeDesignator = 'SRT'
-    seg_property_category_code1.CodeMeaning = 'Anatomical Structure'
-    seg_property_category_code_sequence.append(seg_property_category_code1)
+        # Segmented Property Category Code Sequence
+        seg_property_category_code_sequence = pydi.Sequence()
+        seg1.SegmentedPropertyCategoryCodeSequence = (
+            seg_property_category_code_sequence)
 
-    seg1.SegmentNumber = 1
-    seg1.SegmentLabel = imname + " label " + str(labnum)
-    seg1.SegmentDescription = "Label " + str(labnum) + " of " + imname
-    seg1.SegmentAlgorithmType = 'AUTOMATIC'
-    seg1.SegmentAlgorithmName = 'Unknown'
-    seg1.RecommendedDisplayCIELabValue = lookup_cie(labnum)
-    # Segmented Property Type Code Sequence
-    segmented_property_type_code_sequence = pydi.Sequence()
-    seg1.SegmentedPropertyTypeCodeSequence = (
-        segmented_property_type_code_sequence)
+        # Segmented Property Category Code Sequence:
+        # Segmented Property Category Code 1
+        seg_property_category_code1 = pydi.Dataset()
+        seg_property_category_code1.CodeValue = 'T-D000A'
+        seg_property_category_code1.CodingSchemeDesignator = 'SRT'
+        seg_property_category_code1.CodeMeaning = 'Anatomical Structure'
+        seg_property_category_code_sequence.append(seg_property_category_code1)
 
-    # Segmented Property Type Code Sequence: Segmented Property Type Code 1
-    segmented_property_type_code1 = pydi.Dataset()
-    segmented_property_type_code1.CodeValue = '111176'
-    segmented_property_type_code1.CodingSchemeDesignator = 'DCM'
-    segmented_property_type_code1.CodeMeaning = 'Unspecified'
-    segmented_property_type_code_sequence.append(
-        segmented_property_type_code1)
-    segment_sequence.append(seg1)
+        seg1.SegmentNumber = labnum + 1
+        seg1.SegmentLabel = imname + " label " + str(labs[labnum])
+        seg1.SegmentDescription = ("Label " +
+                                   str(labs[labnum]) +
+                                   " of " + imname)
+        seg1.SegmentAlgorithmType = 'AUTOMATIC'
+        seg1.SegmentAlgorithmName = 'Unknown'
+        seg1.RecommendedDisplayCIELabValue = lookup_cie(labs[labnum])
+        # Segmented Property Type Code Sequence
+        segmented_property_type_code_sequence = pydi.Sequence()
+        seg1.SegmentedPropertyTypeCodeSequence = (
+            segmented_property_type_code_sequence)
+
+        # Segmented Property Type Code Sequence: Segmented Property Type Code 1
+        segmented_property_type_code1 = pydi.Dataset()
+        segmented_property_type_code1.CodeValue = '111176'
+        segmented_property_type_code1.CodingSchemeDesignator = 'DCM'
+        segmented_property_type_code1.CodeMeaning = 'Unspecified'
+        segmented_property_type_code_sequence.append(
+            segmented_property_type_code1)
+        segment_sequence.append(seg1)
 
     return segment_sequence
 
 
 def sitk_labelnifti_to_dicom(niftifile, dicomfile,
-                             outputprefix, seriesNum=0,
+                             outputfile, seriesNum=0,
                              Description=None, StudyUID=None, FrameUID=None,
                              UIDlist=None, SeriesNum=None):
     """
@@ -1939,7 +1926,7 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
     if len(spacing) > 3:
         raise ValueError('Higher than 3D nifti file - stopping')
 
-    perlabelstuff = process_label_im(nif)
+    perlabelstuff = process_label_imA(nif)
 
     # figure out which plane to write. Aiming for isotropic within plane
     # If image is isotropic, should use minimum number of planes
@@ -1963,113 +1950,112 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
     # create basics of dicom
     dicomtemplate = pydi.read_file(dicomfile)
 
-    # This is where we need to start doing per label stuff.
-    # Test with the first label
-    for labelidx in range(len(perlabelstuff["labels"])):
-        labeldcm = dicom_label_skel()
-        labeldcm = dicom_patient_stuff(labeldcm, dicomtemplate)
-        labeldcm = dicom_date_stamps(labeldcm, niftifile)
-        labeldcm.file_meta = mk_filemeta_labelobj()
-        labeldcm.is_little_endian = True
-        labeldcm.is_implicit_VR = False
-        labeldcm.SOPInstanceUID = \
+    labeldcm = dicom_label_skel()
+    labeldcm = dicom_patient_stuff(labeldcm, dicomtemplate)
+    labeldcm = dicom_date_stamps(labeldcm, niftifile)
+    labeldcm.file_meta = mk_filemeta_labelobj()
+    labeldcm.is_little_endian = True
+    labeldcm.is_implicit_VR = False
+    labeldcm.SOPInstanceUID = \
         labeldcm.file_meta.MediaStorageSOPInstanceUID
-        labeldcm.SOPClassUID = labeldcm.file_meta.MediaStorageSOPClassUID
-        labeldcm.SeriesNumber = 877 + seriesNum + labelidx
-        labeldcm.ImageType = "DERIVED\\PRIMARY"
-        labeldcm.SegmentationFractionalType = "PROBABILITY"
-        labeldcm.MaximumFractionalValue = 255
-        labeldcm.ContentDescription = b'Nifti segmentation objects'
-        if StudyUID is not None:
-            labeldcm.StudyInstanceUID = StudyUID
-        if UIDlist is not None:
-            # Add the references to a dicom volume
-            labeldcm.ReferencedSeriesSequence = \
-                dicom_referenced_series_sequence(
+    labeldcm.SOPClassUID = labeldcm.file_meta.MediaStorageSOPClassUID
+    labeldcm.SeriesNumber = 877 + seriesNum
+    labeldcm.ImageType = "DERIVED\\PRIMARY"
+    labeldcm.SegmentationFractionalType = "PROBABILITY"
+    labeldcm.MaximumFractionalValue = 255
+    labeldcm.ContentDescription = b'Nifti segmentation objects'
+    if StudyUID is not None:
+        labeldcm.StudyInstanceUID = StudyUID
+    if UIDlist is not None:
+        # Add the references to a dicom volume
+        labeldcm.ReferencedSeriesSequence = \
+            dicom_referenced_series_sequence(
                 UIDlist,
                 dicomtemplate.SeriesInstanceUID)
-        else:
-            raise Exception("MissingUIDList")
+    else:
+        raise Exception("MissingUIDList")
 
-        if FrameUID is not None:
-            labeldcm.FrameOfReferenceUID = FrameUID
-        if Description is not None:
-            labeldcm.SeriesDescription = Description
+    if FrameUID is not None:
+        labeldcm.FrameOfReferenceUID = FrameUID
+    if Description is not None:
+        labeldcm.SeriesDescription = Description
 
-        labeldcm.DimensionOrganizationType = '3D'
-        labeldcm.SamplesPerPixel = 1
-        labeldcm.PhotometricInterpretation = 'MONOCHROME2'
+    labeldcm.DimensionOrganizationType = '3D'
+    labeldcm.SamplesPerPixel = 1
+    labeldcm.PhotometricInterpretation = 'MONOCHROME2'
 
-        cropsize = perlabelstuff["rois"][labelidx].GetSize()
+    cropsize = perlabelstuff["cropped"].GetSize()
 
-        labeldcm.NumberOfFrames = cropsize[isoidx]
-        labeldcm.Rows = int(cropsize[otheridx[1]])
-        labeldcm.Columns = int(cropsize[otheridx[0]])
-        labeldcm.BitsAllocated = 8
-        labeldcm.BitsStored = 8
-        labeldcm.HighBit = 7
-        labeldcm.PixelRepresentation = 0
-        labeldcm.LossyImageCompression = '00'
-        labeldcm.SegmentationType = 'FRACTIONAL'
+    totalframes = count_total_frames(perlabelstuff, isoidx)
+    labeldcm.NumberOfFrames = totalframes
+    labeldcm.Rows = int(cropsize[otheridx[1]])
+    labeldcm.Columns = int(cropsize[otheridx[0]])
+    labeldcm.BitsAllocated = 8
+    labeldcm.BitsStored = 8
+    labeldcm.HighBit = 7
+    labeldcm.PixelRepresentation = 0
+    labeldcm.LossyImageCompression = '00'
+    labeldcm.SegmentationType = 'FRACTIONAL'
 
-        # Dimension organisation
-        # - uses macros (0062,0004) - segment number
-        #               (0062,0002) - segment sequence
-        #                   (tag for a sequence that comes next)
-        #               (0020,0032) - image position patient
-        #               (0020,9113) - plane position sequence
-        dos = pydi.Sequence()
-        do1 = pydi.Dataset()
-        do1.DimensionOrganizationUID = dcm_uuid()
-        dos.append(do1)
-        labeldcm.DimensionOrganizationSequence = dos
+    # Dimension organisation
+    # - uses macros (0062,0004) - segment number
+    #               (0062,0002) - segment sequence
+    #                   (tag for a sequence that comes next)
+    #               (0020,0032) - image position patient
+    #               (0020,9113) - plane position sequence
+    dos = pydi.Sequence()
+    do1 = pydi.Dataset()
+    do1.DimensionOrganizationUID = dcm_uuid()
+    dos.append(do1)
+    labeldcm.DimensionOrganizationSequence = dos
 
-        dis = pydi.Sequence()
-        di1 = pydi.Dataset()
-        di1.DimensionOrganizationUID = do1.DimensionOrganizationUID
-        di1.DimensionIndexPointer = pydi.tag.Tag(0x0062, 0x0004)
-        di1.FunctionalGroupPointer = pydi.tag.Tag(0x0062, 0x0002)
-        dis.append(di1)
+    dis = pydi.Sequence()
+    di1 = pydi.Dataset()
+    di1.DimensionOrganizationUID = do1.DimensionOrganizationUID
+    di1.DimensionIndexPointer = pydi.tag.Tag(0x0062, 0x0004)
+    di1.FunctionalGroupPointer = pydi.tag.Tag(0x0062, 0x0002)
+    dis.append(di1)
 
-        di2 = pydi.Dataset()
-        di2.DimensionOrganizationUID = do1.DimensionOrganizationUID
-        di2.DimensionIndexPointer = pydi.tag.Tag(0x0020, 0x0032)
-        di2.FunctionalGroupPointer = pydi.tag.Tag(0x0020, 0x9113)
-        dis.append(di2)
+    di2 = pydi.Dataset()
+    di2.DimensionOrganizationUID = do1.DimensionOrganizationUID
+    di2.DimensionIndexPointer = pydi.tag.Tag(0x0020, 0x0032)
+    di2.FunctionalGroupPointer = pydi.tag.Tag(0x0020, 0x9113)
+    dis.append(di2)
 
-        labeldcm.DimensionIndexSequence = dis
-        labeldcm.DimensionOrganizationType = "3D"
+    labeldcm.DimensionIndexSequence = dis
+    labeldcm.DimensionOrganizationType = "3D"
 
-        # Segmentation sequence
-        labeldcm.SegmentSequence = (
-            mk_label_segment_sequence(imname, perlabelstuff["labels"][labelidx]))
+    # Segmentation sequence
+    labeldcm.SegmentSequence = (
+        mk_label_segment_sequence(imname, perlabelstuff["labels"]))
 
-        # Shared Functional Groups Sequence - do we need this
-        # Brainlab and slicer version have an image orientation patient inside it
-        
-        labeldcm.SharedFunctionalGroupsSequence = mk_shared_functional_group(nif, UIDlist)
-        
-        # Per-frame functional groups sequence - contains segment number,
-        # frame number and position. This is where a lot of the action is.
-        labeldcm.PerFrameFunctionalGroupsSequence = (
-            mk_perframe_functional_group(perlabelstuff, labelidx, UIDlist))
-        # Pixels at the end - encapsulated form
+    # Shared Functional Groups Sequence - do we need this
+    # Brainlab and slicer version have an image orientation patient inside it
 
-        labeldcm.PixelData = mk_rle_data(perlabelstuff, labelidx)
-        labeldcm["PixelData"].VR = 'OB'
-        labeldcm["PixelData"].is_undefined_length = True
-        
-        outputfile = outputprefix + str(perlabelstuff["labels"][labelidx]) + ".dcm"
-        
-        pydi.filewriter.dcmwrite(outputfile, labeldcm,
-                                 write_like_original=False)
+    labeldcm.SharedFunctionalGroupsSequence = \
+        mk_shared_functional_group(nif, UIDlist)
+
+    # Per-frame functional groups sequence - contains segment number,
+    # frame number and position. This is where a lot of the action is.
+    labeldcm.PerFrameFunctionalGroupsSequence = (
+        mk_perframe_functional_group(perlabelstuff, UIDlist))
+    # Pixels at the end - encapsulated form
+
+    labeldcm.PixelData = mk_rle_data(perlabelstuff)
+    labeldcm["PixelData"].VR = 'OB'
+    labeldcm["PixelData"].is_undefined_length = True
+
+    pydi.filewriter.dcmwrite(outputfile, labeldcm,
+                             write_like_original=False)
 
 
 ########################################################################
 # Driver scripts to import collections of nifti and tract files
 
 
-def import_tractography_study(origdcm, niftifiles, tckfiles, labelfiles, destdir="./",
+def import_tractography_study(origdcm, niftifiles,
+                              tckfiles, labelfiles=None,
+                              destdir="./",
                               StudyUID=None, FrameUID=None):
     """
     Create a dicom study for brainlab from nifti and tck files.
@@ -2112,8 +2098,8 @@ def import_tractography_study(origdcm, niftifiles, tckfiles, labelfiles, destdir
 
     [os.makedirs(x, exist_ok=True) for x in t_dir]
 
-    t_dir = [os.path.join(x, "FT_00.dcm") for x in t_dir]    
-    
+    t_dir = [os.path.join(x, "FT_00.dcm") for x in t_dir]
+
     nidetails = [
         sitk_nifti_to_dicom(niftifile=niftifiles[idx], dicomfile=origdcm,
                             dcmprefix="IM",
@@ -2121,7 +2107,7 @@ def import_tractography_study(origdcm, niftifiles, tckfiles, labelfiles, destdir
                             StudyUID=StudyUID, FrameUID=FrameUID,
                             SeriesNum=idx + 1) for idx in
         range(len(niftifiles))]
-    
+
     tckdetails = [tck_to_dicom(tckfile=tckfiles[idx],
                                dicomfile=nidetails[0]['dcmfiles'][0],
                                outputfile=t_dir[idx],
@@ -2135,13 +2121,13 @@ def import_tractography_study(origdcm, niftifiles, tckfiles, labelfiles, destdir
     if labelfiles is not None:
         # now for label images
         ln_bn = [os.path.basename(x) for x in labelfiles]
-        ln_cn =  [os.path.splitext(x)[0] for x in ln_bn]
+        ln_cn = [os.path.splitext(x)[0] for x in ln_bn]
         ln_cn = [os.path.splitext(x)[0] for x in ln_cn]
 
         ln_dir = [os.path.join(destdir, x) for x in ln_cn]
 
         [os.makedirs(x, exist_ok=True) for x in ln_dir]
-        ln_dir = [os.path.join(x, "LB_") for x in ln_dir]
+        ln_dir = [os.path.join(x, "LB.dcm") for x in ln_dir]
 
         # figure out which image that we've already converted
         # matches the label image
@@ -2152,12 +2138,12 @@ def import_tractography_study(origdcm, niftifiles, tckfiles, labelfiles, destdir
             sitk_labelnifti_to_dicom(
                 labelfiles[idx],
                 dicomfile=nidetails[nif_index]['dcmfiles'][0],
-                outputprefix=ln_dir[idx],
+                outputfile=ln_dir[idx],
                 Description=ln_cn[idx],
                 StudyUID=StudyUID,
                 UIDlist=nidetails[nif_index]['SOPlist'],
                 FrameUID=FrameUID)
-      
+
     return [n_dir, t_dir]
 
 
