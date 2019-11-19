@@ -33,7 +33,8 @@ def pytest_configure(config):
 
 def pytest_collection_modifyitems(config, items):
     if config.getoption("--runcreatebaseline"):
-        # --runcreatebaseline given in cli: do not skip slow tests
+        # --runcreatebaseline given in cli: do not skip tests that
+        # create the baseline comparison data
         return
     skip_createbaseline = pytest.mark.skip(
         reason="need --runcreatebaseline option to run")
