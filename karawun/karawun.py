@@ -2134,7 +2134,10 @@ def import_tractography_study(origdcm, niftifiles,
         # We end up loading the niftifile again.
         for idx in range(len(labelfiles)):
             nif_index = find_match_im(labelfiles[idx], nidetails)
-            print(nif_index)
+
+            if nif_index is None:
+                raise Exception("RawToLabelImMismatch")
+            
             sitk_labelnifti_to_dicom(
                 labelfiles[idx],
                 dicomfile=nidetails[nif_index]['dcmfiles'][0],

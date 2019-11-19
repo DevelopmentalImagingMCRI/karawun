@@ -117,6 +117,27 @@ def label_converter(targetd):
                                       labelfiles=MR_LAB,
                                       destdir=targetd)
 
+def label_converter_fail(targetd):
+    # This should fail as there is no
+    # image in the same space as the segmentation
+    test_data = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), 'Data')
+    t1dcm = os.path.join(test_data, "Dicom",
+                         ("1.3.12.2.1107.5.2.43."
+                          "167031.2019040213095021814319052.dcm"))
+    MR = ['FAbrain.nii.gz']
+    MR = [os.path.join(test_data, "Tractography", nii) for nii in MR]
+    MR_LAB = ['words.nii.gz', 'globes.nii.gz']
+    MR_LAB = [os.path.join(test_data, "Tractography", nii) for nii in MR_LAB]
+    
+    TCK = ['Left_PT_final.tck', 'Right_PT_final.tck']
+    TCK = [os.path.join(test_data, "Tractography", tck) for tck in TCK]
+    karawun.import_tractography_study(origdcm=t1dcm,
+                                      niftifiles=MR,
+                                      tckfiles=TCK,
+                                      labelfiles=MR_LAB,
+                                      destdir=targetd)
+
 
 @mock.patch('time.localtime', side_effect=patchLocalTime)
 @mock.patch('karawun.karawun.dcm_uuid', side_effect=UUIDClass().patchdcm_uuid)
@@ -154,7 +175,10 @@ def test_conv2(dcm_uuid, localtime, tmp_path):
     baselinesha = json.loads(f.read())
     f.close()
     assert(baselinesha == this_sha512)
-    
+
+def test_conv3(tmp_path):
+    with pytest.raises(Exception):
+        label_converter_fail(tmp_path)
 
 def mkSha(pth, jso):
     baselined = os.path.join(
