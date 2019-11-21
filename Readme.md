@@ -2,6 +2,8 @@
 
 ![Brainlab screenshot](Pics/brainlab_screenshot.png)
 
+![Brainlab objects](Pics/brainlab_objects.png)
+
 ## Introduction
 
 _Karawun_ converts the results of a diffusion MRI tractography study,
