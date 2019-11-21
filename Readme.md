@@ -166,6 +166,8 @@ test is run.
 
 Please use the github [issue tracker](https://github.com/DevelopmentalImagingMCRI/karawun/issues) to ask questions or report problems.
 
+Shoutouts indicating that you are using _Karawun_ are also appreciated.
+
 # Licensing
 
 _Karawun_ is distributed under the Apache License 2.0
