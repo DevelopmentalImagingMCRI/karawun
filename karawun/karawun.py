@@ -73,6 +73,17 @@ else:
 nice_colours_cie = [ciedicom.rgb2DicomLab(col) for
                     col in ciedicom.nice_colours_rgb]
 
+class Error(Exception):
+   """Base class for other exceptions"""
+   pass
+class MissingUIDList(Error):
+   """Raised when the required UID list is missing"""
+   pass
+class RawToLabelImMismatch(Error):
+   """Raised when one of the label images doesn't match any of the raw"""
+   pass
+
+
 # mrtrix tckfile stuff
 # converts the MIF datatypes
 # Bit    bitwise data
@@ -1687,30 +1698,6 @@ def mk_shared_functional_group(nif, SOPList):
     return(sfgs)
 
 
-def mk_uid_sublist(UIDlist, perlabelstuff, labelidx):
-    """create a list of UIDs corresponding to the dicoms of
-       slices in the correspondinging raw volume
-       Turns out that we don't need it.
-    """
-    nif = perlabelstuff['original']
-    isoidx = check_isotropy(nif)
-    otheridx = [0, 1, 2]
-    otheridx.remove(isoidx)
-
-    # sanity checks
-    sz = nif.GetSize()
-    slices = sz[isoidx]
-    if slices != len(UIDlist):
-        print("Length of UID list does not match slices in label image")
-        raise Exception("MismatchUIDList")
-
-    corner = perlabelstuff["corners"][labelidx]
-    sizes = perlabelstuff["sizes"][labelidx]
-    isocorner = corner[isoidx]
-    isosize = sizes[isoidx]
-    return(UIDlist[isocorner:(isocorner+isosize)])
-
-
 def mk_perframe_functional_group(perlabelstuff, UIDlist):
     """key section describing the per label, per slice
     image data that is later run length encoded
@@ -1973,7 +1960,7 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
                 UIDlist,
                 dicomtemplate.SeriesInstanceUID)
     else:
-        raise Exception("MissingUIDList")
+        raise MissingUIDList
 
     if FrameUID is not None:
         labeldcm.FrameOfReferenceUID = FrameUID
@@ -2136,7 +2123,7 @@ def import_tractography_study(origdcm, niftifiles,
             nif_index = find_match_im(labelfiles[idx], nidetails)
 
             if nif_index is None:
-                raise Exception("RawToLabelImMismatch")
+                raise RawToLabelImMismatch
             
             sitk_labelnifti_to_dicom(
                 labelfiles[idx],

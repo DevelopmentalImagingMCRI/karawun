@@ -64,12 +64,16 @@ parser.add_argument("-l", "--label-files", nargs="+",
                     
 
 def run_cli(args):
-    karawun.import_tractography_study(origdcm=args.dicom_template,
-                                      niftifiles=args.nifti,
-                                      tckfiles=args.tract_files,
-                                      labelfiles=args.label_files,
-                                      destdir=args.output_dir)
-
+    try:
+        karawun.import_tractography_study(origdcm=args.dicom_template,
+                                          niftifiles=args.nifti,
+                                          tckfiles=args.tract_files,
+                                          labelfiles=args.label_files,
+                                          destdir=args.output_dir)
+    except karawun.RawToLabelImMismatch:
+        print("One of the label images is not derived from any of the raw images")
+    except karawun.MissingUIDList:
+        print("A UID list is required iternally somewhere - this error shouldn't happen")
 if __name__ == '__main__':
     args=parser.parse_args()
     run_cli(args)
