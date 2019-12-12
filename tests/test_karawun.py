@@ -30,7 +30,7 @@ import karawun.karawun
 # pytest tests/
 
 # to create the baseline sha object
-# pytest --runcreatebaseline -k 'not test_conv1' tests/
+# pytest --runcreatebaseline -k 'not test_conv1 and not test_conv2' tests/
 
 # Patched timestamp and uuid functions
 # for testing
@@ -90,7 +90,53 @@ def converter(targetd):
     MR = [os.path.join(test_data, "Tractography", nii) for nii in MR]
     TCK = ['Left_PT_final.tck', 'Right_PT_final.tck']
     TCK = [os.path.join(test_data, "Tractography", tck) for tck in TCK]
-    karawun.import_tractography_study(t1dcm, MR, TCK, targetd)
+    karawun.import_tractography_study(origdcm=t1dcm,
+                                      niftifiles=MR,
+                                      tckfiles=TCK,
+                                      labelfiles=None,
+                                      destdir=targetd)
+
+    # test routines
+def label_converter(targetd):
+    test_data = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), 'Data')
+    t1dcm = os.path.join(test_data, "Dicom",
+                         ("1.3.12.2.1107.5.2.43."
+                          "167031.2019040213095021814319052.dcm"))
+    MR = ['T1brain.nii.gz', 'FLAIRbrain.nii.gz',
+          'FAbrain.nii.gz']
+    MR = [os.path.join(test_data, "Tractography", nii) for nii in MR]
+    MR_LAB = ['words.nii.gz', 'globes.nii.gz']
+    MR_LAB = [os.path.join(test_data, "Tractography", nii) for nii in MR_LAB]
+    
+    TCK = ['Left_PT_final.tck', 'Right_PT_final.tck']
+    TCK = [os.path.join(test_data, "Tractography", tck) for tck in TCK]
+    karawun.import_tractography_study(origdcm=t1dcm,
+                                      niftifiles=MR,
+                                      tckfiles=TCK,
+                                      labelfiles=MR_LAB,
+                                      destdir=targetd)
+
+def label_converter_fail(targetd):
+    # This should fail as there is no
+    # image in the same space as the segmentation
+    test_data = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), 'Data')
+    t1dcm = os.path.join(test_data, "Dicom",
+                         ("1.3.12.2.1107.5.2.43."
+                          "167031.2019040213095021814319052.dcm"))
+    MR = ['FAbrain.nii.gz']
+    MR = [os.path.join(test_data, "Tractography", nii) for nii in MR]
+    MR_LAB = ['words.nii.gz', 'globes.nii.gz']
+    MR_LAB = [os.path.join(test_data, "Tractography", nii) for nii in MR_LAB]
+    
+    TCK = ['Left_PT_final.tck', 'Right_PT_final.tck']
+    TCK = [os.path.join(test_data, "Tractography", tck) for tck in TCK]
+    karawun.import_tractography_study(origdcm=t1dcm,
+                                      niftifiles=MR,
+                                      tckfiles=TCK,
+                                      labelfiles=MR_LAB,
+                                      destdir=targetd)
 
 
 @mock.patch('time.localtime', side_effect=patchLocalTime)
@@ -112,16 +158,53 @@ def test_conv1(dcm_uuid, localtime, tmp_path):
     assert(baselinesha == this_sha512)
 
 
+@mock.patch('time.localtime', side_effect=patchLocalTime)
+@mock.patch('karawun.karawun.dcm_uuid', side_effect=UUIDClass().patchdcm_uuid)
+def test_conv2(dcm_uuid, localtime, tmp_path):
+    baselineshaf = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), 'Baseline',
+        "seg_sha512.json")
+
+    assert os.path.exists(baselineshaf),\
+        ("Missing json file - run pytest --runcreatebaseline"
+         "-k 'not test_conv1'")
+    print("Destination folder = " + str(tmp_path))
+    label_converter(tmp_path)
+    this_sha512 = get_all_sha512(tmp_path)
+    f = open(baselineshaf)
+    baselinesha = json.loads(f.read())
+    f.close()
+    assert(baselinesha == this_sha512)
+
+def test_conv3(tmp_path):
+    with pytest.raises(Exception):
+        label_converter_fail(tmp_path)
+
+def mkSha(pth, jso):
+    baselined = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), 'Baseline')
+    baseline_sha = get_all_sha512(pth)
+    # save it (json to play more nicely with git)
+    json_sha = json.dumps(baseline_sha)
+    f = open(os.path.join(baselined, jso), "w")
+    f.write(json_sha)
+    f.close()
+
+
 @pytest.mark.createbaseline
 @mock.patch('time.localtime', side_effect=patchLocalTime)
 @mock.patch('karawun.karawun.dcm_uuid', side_effect=UUIDClass().patchdcm_uuid)
-def test_create_baseline_sha(dcm_uuid, localtime, tmp_path):
+def test_create_baseline_shaA(dcm_uuid, localtime, tmp_path):
+    print("Creating baseline checksums for images+tractography")
     converter(tmp_path)
-    baselined = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), 'Baseline')
-    baseline_sha = get_all_sha512(tmp_path)
-    # save it (json to play more nicely with git)
-    json_sha = json.dumps(baseline_sha)
-    f = open(os.path.join(baselined, "image_sha512.json"), "w")
-    f.write(json_sha)
-    f.close()
+    mkSha(tmp_path, "image_sha512.json")
+    
+
+@pytest.mark.createbaseline
+@mock.patch('time.localtime', side_effect=patchLocalTime)
+@mock.patch('karawun.karawun.dcm_uuid', side_effect=UUIDClass().patchdcm_uuid)
+def test_create_baseline_shaB(dcm_uuid, localtime, tmp_path):
+    label_converter(tmp_path)
+    mkSha(tmp_path, "seg_sha512.json")
+
+    

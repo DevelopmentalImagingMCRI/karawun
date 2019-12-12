@@ -18,8 +18,11 @@
 #
 # python tools for creating Brainlab compatible dicoms from nifti and
 # mrtrix streamline files.
-
+#
+# Author: Richard Beare
+#
 import pydicom as pydi
+import pydicom._storage_sopclass_uids as storage_sopclass
 import SimpleITK as sitk
 import numpy as np
 import time
@@ -32,7 +35,7 @@ import os.path
 import re
 import struct
 import glob
-
+from . import ciedicom
 #  Constants that brainlab uses in the streamline files - not sure
 #  if they are important or not
 
@@ -63,6 +66,23 @@ else:
     AlgorithmName = 'Fibertracking'
     ContentCreatorName = ""
     SeriesDescription = 'Fiber bundles'
+
+
+# Stuff to do with cie colours
+
+nice_colours_cie = [ciedicom.rgb2DicomLab(col) for
+                    col in ciedicom.nice_colours_rgb]
+
+class Error(Exception):
+   """Base class for other exceptions"""
+   pass
+class MissingUIDList(Error):
+   """Raised when the required UID list is missing"""
+   pass
+class RawToLabelImMismatch(Error):
+   """Raised when one of the label images doesn't match any of the raw"""
+   pass
+
 
 # mrtrix tckfile stuff
 # converts the MIF datatypes
@@ -768,7 +788,7 @@ def mk_file_meta():
     file_meta = pydi.Dataset()
     # MR Image SOP - Enhanced MR Image SOP
     # contains some extra synchronization
-    # fields
+    # fields - use storage_sopclass
     file_meta.MediaStorageSOPClassUID = '1.2.840.10008.5.1.4.1.1.4'
     file_meta.MediaStorageSOPInstanceUID = dcm_uuid()
     # This number uniquely identifies my application.
@@ -883,8 +903,8 @@ def mk_indexing_tuple(index, plane):
 
 
 def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
-                    Description=None, StudyUID=None, FrameUID=None,
-                    SeriesNum=None):
+                        Description=None, StudyUID=None, FrameUID=None,
+                        SeriesNum=None):
     """:param niftifile: (string) path to nifti image
     :param dicomfile: (string) path to a dicom file - used to supply some
                    important tags
@@ -899,9 +919,10 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
                  dicoms in a common space
     :param SeriesNum: (int) unique within a study - helps identify
                   files in a series
-    :return: tuple of list of strings containing InstanceUIDs for
-        constructing other dicoms and the dicom
-        structure containing the common parts.
+    :return: dictionary of list of strings containing InstanceUIDs for
+        constructing other dicoms, the dicom
+        structure containing the common parts, and nifti details
+        for matching up with label images.
 
      Notes :
      Scaling is an issue. Lots of dicom conversion tools don't
@@ -1029,7 +1050,7 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
         corner = [0, 0, 0]
         corner[isoidx] = i
         origin = nif.TransformIndexToPhysicalPoint(corner)
-        origin = [str(x) for x in origin]
+        origin = str2ds(origin)
         thisslice.ImagePositionPatient = origin
         thisslice.ImageOrientationPatient = direction
         thisslice.PixelSpacing = spacing
@@ -1047,7 +1068,9 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
         SOPlist.append(thisslice.SOPInstanceUID)
         filenames.append(fname)
 
-    return {'SOPlist': SOPlist, 'dcm': t1d, 'dcmfiles': filenames}
+    return {'SOPlist': SOPlist, 'dcm': t1d,
+            'dcmfiles': filenames, 'spacing': nif.GetSpacing(),
+            'size': imsize, 'matrix': oMatrix}
 
 
 ##################################################################
@@ -1055,7 +1078,7 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
 
 def mk_filemeta_streamlines():
     file_meta = pydi.Dataset()
-    # Surface segmentation storage
+    # Surface segmentation storage - use storage_sopclass
     file_meta.MediaStorageSOPClassUID = '1.2.840.10008.5.1.4.1.1.66.5'
     file_meta.MediaStorageSOPInstanceUID = dcm_uuid()
     # This number uniquely identifies my application.
@@ -1069,9 +1092,18 @@ def mk_filemeta_streamlines():
     return file_meta
 
 
+# Label stuff
+def mk_filemeta_labelobj():
+    file_meta = mk_filemeta_streamlines()
+    # Segmentation storage - use storage_sopclass
+    file_meta.MediaStorageSOPClassUID = '1.2.840.10008.5.1.4.1.1.66.4'
+    file_meta.TransferSyntaxUID = pydi.uid.RLECompressedLosslessSyntaxes
+    return file_meta
+
 # Put the mrtrix file details into content description
 # (64 characters max)
 # filename (without .tck), method, lmax, max_dist
+
 
 def dicom_date_stamps(newdcm, thefile):
     # Put a files date stamp into dicom fields
@@ -1131,7 +1163,7 @@ def dicom_referenced_series_sequence(UIDlist, SeriesInstance):
 
 
 # SeriesNumber - what to do?
-def dicom_skel():
+def dicom_fibre_skel():
     """
     Create a dataset skeleton, without patient/doctor details,
     frames of reference
@@ -1160,6 +1192,19 @@ def dicom_skel():
     newdcm.SeriesInstanceUID = dcm_uuid()
     newdcm.SoftwareVersions = SoftwareVersions
     newdcm.SpecificCharacterSet = 'ISO_IR 100'
+    return newdcm
+
+
+def dicom_label_skel():
+    """
+    Create a dataset skeleton appropriate for label objects,
+    without patient/doctor details, frames of reference
+    etc.
+    :return: a skeleton pydicom dataset
+    """
+    newdcm = dicom_fibre_skel()
+    newdcm.ContentLabel = "EXT SEG"
+    newdcm.SeriesDescription = "objects from workup"
     return newdcm
 
 
@@ -1374,8 +1419,8 @@ def mk_segment_sequence(description, label, UIDlist, surfaces):
 
 
 def tck_to_dicom(tckfile, dicomfile, outputfile, seriesNum=0,
-              Description=None, StudyUID=None, UIDlist=None,
-              FrameUID=None):
+                 Description=None, StudyUID=None, UIDlist=None,
+                 FrameUID=None):
     """
     Create a brainlab compatible dicom containing streamlines
     from a mrtrix tckfile. Writes to outfile as well as
@@ -1410,7 +1455,7 @@ def tck_to_dicom(tckfile, dicomfile, outputfile, seriesNum=0,
             'method'] + ",lmax=" + str(tck['lmax'])
     # create basics of dicom
     dicomtemplate = pydi.read_file(dicomfile)
-    fibredcm = dicom_skel()
+    fibredcm = dicom_fibre_skel()
     fibredcm = dicom_patient_stuff(fibredcm, dicomtemplate)
     fibredcm = dicom_date_stamps(fibredcm, tckfile)
     fibredcm.file_meta = mk_filemeta_streamlines()
@@ -1446,11 +1491,559 @@ def tck_to_dicom(tckfile, dicomfile, outputfile, seriesNum=0,
                              write_like_original=False)
     return fibredcm
 
-########################################################################
-# Driver scripts to import collections of nifti and tract files 
 
-def import_tractography_study(origdcm, niftifiles, tckfiles, destdir="./",
-                            StudyUID=None, FrameUID=None):
+def lookup_cie(labnum):
+    global nice_colours_cie
+    if labnum > (len(nice_colours_cie) - 1):
+        labnum = len(nice_colours_cie) - 1
+        print("Error - too many labels")
+    return list(nice_colours_cie[labnum])
+
+
+def process_label_im(im):
+    """Create a binary separate image for each label
+    cropped in a special way. I can't see how to encode
+    a separate image space for each label. Brainlab stores
+    a single segmentation per file. We'll do the same.
+
+    Note that Brainlab can read multi-segmentations.
+
+    Returns a dictionary of images and corresponding
+    labels (for choosing colours), also a scene bounding
+    box.
+    """
+    # stuff to figure out which way we slice, etc
+    isoidx = check_isotropy(im)
+    otheridx = [0, 1, 2]
+    otheridx.remove(isoidx)
+
+    direction = get_direction(im, isoidx)
+    sp = im.GetSpacing()
+    sp = str2ds(sp)
+    spacing = [sp[i] for i in otheridx]
+    slthickness = sp[isoidx]
+
+    labstats = sitk.LabelShapeStatisticsImageFilter()
+    labstats.Execute(im)
+    labels = labstats.GetLabels()
+    boxes = [labstats.GetBoundingBox(i) for i in labels]
+    # Need to compute bounding box for all labels, as
+    # this will set the row/colums
+    # boxes are corner and size - this code assumes 3D
+    corners = [(x[0], x[1], x[2]) for x in boxes]
+    sizes = [(x[3], x[4], x[5]) for x in boxes]
+
+    newcorners = [list(x) for x in corners]
+    newsizes = [list(x) for x in sizes]
+
+    ims = [sitk.RegionOfInterest(im, newsizes[i],
+                                 newcorners[i]) == labels[i]
+           for i in range(len(labels))]
+
+    return({'rois': ims, 'labels': labels,
+            'corners': corners,
+            'sizes': sizes,
+            'original': im})
+
+
+def count_total_frames(perlabelstuff, isoidx):
+    totalframes = 0
+    for l in range(len(perlabelstuff['rois'])):
+        sz = perlabelstuff['rois'][l].GetSize()
+        totalframes += sz[isoidx]
+    return totalframes
+
+
+def process_label_imA(im):
+    """Crop a label image so that the result contains
+    all labels, then return separate images, one for
+    each label.
+    Returns a dictionary of images and corresponding
+    labels (for choosing colours), also a scene bounding
+    box. Need to run shape statistics to determine
+    the number of labels and the IDs
+    """
+    # stuff to figure out which way we slice, etc
+    isoidx = check_isotropy(im)
+    otheridx = [0, 1, 2]
+    otheridx.remove(isoidx)
+
+    direction = get_direction(im, isoidx)
+    sp = im.GetSpacing()
+    sp = str2ds(sp)
+    spacing = [sp[i] for i in otheridx]
+    slthickness = sp[isoidx]
+
+    labstats = sitk.LabelShapeStatisticsImageFilter()
+    labstats.Execute(im)
+    labels = labstats.GetLabels()
+    boxes = [labstats.GetBoundingBox(i) for i in labels]
+    # Need to compute bounding box for all labels, as
+    # this will set the row/colums
+    # boxes are corner and size - this code assumes 3D
+    corners = [(x[0], x[1], x[2]) for x in boxes]
+    othercorner = [(x[0] + x[3] - 1,
+                    x[1] + x[4] - 1,
+                    x[2] + x[5] - 1) for x in boxes]
+    sizes = [(x[3], x[4], x[5]) for x in boxes]
+
+    all_low_x = [C[0] for C in corners]
+    all_low_y = [C[1] for C in corners]
+    all_low_z = [C[2] for C in corners]
+
+    low_x = min(all_low_x)
+    low_y = min(all_low_y)
+    low_z = min(all_low_z)
+    lowcorner = (low_x, low_y, low_z)
+
+    all_high_x = [C[0] for C in othercorner]
+    all_high_y = [C[1] for C in othercorner]
+    all_high_z = [C[2] for C in othercorner]
+
+    high_x = max(all_high_x)
+    high_y = max(all_high_y)
+    high_z = max(all_high_z)
+    highcorner = (high_x, high_y, high_z)
+
+    allsize = (highcorner[0] - lowcorner[0] + 1,
+               highcorner[1] - lowcorner[1] + 1,
+               highcorner[2] - lowcorner[2] + 1)
+
+    # corners [otheridx] and size[otheridx] should be all the same
+    newcorners = [list(x) for x in corners]
+    newsizes = [list(x) for x in sizes]
+
+    a = otheridx[0]
+    b = otheridx[1]
+    for f in range(len(newcorners)):
+        newcorners[f][a] = lowcorner[a]
+        newcorners[f][b] = lowcorner[b]
+        newsizes[f][a] = allsize[a]
+        newsizes[f][b] = allsize[b]
+
+    ims = [sitk.RegionOfInterest(im, allsize,
+                                 lowcorner) == labels[i]
+           for i in range(len(labels))]
+    imcrop = sitk.RegionOfInterest(im, allsize, lowcorner)
+    return({'rois': ims, 'labels': labels,
+            'original': im, 'cropped': imcrop})
+
+
+def mk_shared_functional_group(nif, SOPList):
+    """Create the orientation information that
+    goes in the SharedFunctionalGroups sequence
+    """
+    # set up image geometry details
+    isoidx = check_isotropy(nif)
+    otheridx = [0, 1, 2]
+    otheridx.remove(isoidx)
+
+    direction = get_direction(nif, isoidx)
+    direction = str2ds(direction)
+    sp = nif.GetSpacing()
+    sp = str2ds(sp)
+    spacing = [sp[i] for i in otheridx]
+    slthickness = sp[isoidx]
+
+    sfgs = pydi.Sequence()
+    sfg1 = pydi.Dataset()
+
+    di = pydi.Dataset()
+    di.DerivationDescription = 'Segmentation'
+
+    sis = pydi.Sequence()
+
+    def mk_sis(SOPInst):
+        si = pydi.Dataset()
+        si.ReferencedSOPClassUID = storage_sopclass.MRImageStorage
+        si.ReferencedSOPInstanceUID = SOPInst
+        ps = pydi.Sequence()
+        purpose = pydi.Dataset()
+        purpose.CodeValue = '121322'
+        purpose.CodingSchemeDesignator = 'DCM'
+        purpose.CodeMeaning = 'Source Image for Image Processing Operation'
+        ps.append(purpose)
+        si.PurposeOfReferenceCodeSequence = ps
+        return si
+
+    for g in range(len(SOPList)):
+        sis.append(mk_sis(SOPList[g]))
+
+    di.SourceImageSequence = sis
+
+    dcs = pydi.Sequence()
+    dc = pydi.Dataset()
+    dc.CodeValue = '113076'
+    dc.CodingSchemeDesignator = 'DCM'
+    dc.CodeMeaning = 'Segmentation'
+    dcs.append(dc)
+
+    di.DerivationCodeSequence = dcs
+    dis = pydi.Sequence()
+    dis.append(di)
+    sfg1.DerivationImageSequence = dis
+
+    pos = pydi.Sequence()
+    po1 = pydi.Dataset()
+    po1.ImageOrientationPatient = direction
+    pos.append(po1)
+    pms = pydi.Sequence()
+    pm1 = pydi.Dataset()
+    pm1.SliceThickness = slthickness
+    pm1.PixelSpacing = spacing
+    pms.append(pm1)
+    sfg1.PlaneOrientationSequence = pos
+    sfg1.PixelMeasuresSequence = pms
+    sfgs.append(sfg1)
+    return(sfgs)
+
+
+def mk_perframe_functional_group(perlabelstuff, UIDlist):
+    """key section describing the per label, per slice
+    image data that is later run length encoded
+    :perlabelstuff: is the subsetted images/bounding boxes
+    """
+
+    # Sort out the isotropic slice direction.
+    # This repeats code from other places, but
+    # saves passing lots of data around
+    # Use the original data, not subsets.
+    nif = perlabelstuff['original']
+    isoidx = check_isotropy(nif)
+    otheridx = [0, 1, 2]
+    otheridx.remove(isoidx)
+
+    pffgs = pydi.Sequence()
+    # one frame content sequence per slice, per label
+    lablist = perlabelstuff['labels']
+
+    for labelidx in range(len(lablist)):
+        label_id = lablist[labelidx]
+
+        this_roi = perlabelstuff['rois'][labelidx]
+        this_size = this_roi.GetSize()
+        this_slices = this_size[isoidx]
+        thiscropped = perlabelstuff["rois"][labelidx]
+        for thisslice in range(this_slices):
+            pffg1 = pydi.Dataset()
+            corner = [0, 0, 0]
+            corner[isoidx] = thisslice
+            origin = thiscropped.TransformIndexToPhysicalPoint(corner)
+            fcs = pydi.Sequence()
+            fc1 = pydi.Dataset()
+            fc1.DimensionIndexValues = [labelidx + 1, thisslice + 1]
+            fcs.append(fc1)
+            pps = pydi.Sequence()
+            pp1 = pydi.Dataset()
+            origin = str2ds(origin)
+            pp1.ImagePositionPatient = origin
+
+            pps.append(pp1)
+
+            sis = pydi.Sequence()
+            si1 = pydi.Dataset()
+            # only ever one segment per file
+            si1.ReferencedSegmentNumber = labelidx + 1
+            sis.append(si1)
+            pffg1.PlanePositionSequence = pps
+            pffg1.FrameContentSequence = fcs
+            pffg1.SegmentIdentificationSequence = sis
+            pffgs.append(pffg1)
+
+    return(pffgs)
+
+
+def mk_rle_data(perlabelstuff):
+    """
+    Do the run length encoding and encapsulation of
+    all labels. Note that the first byte array is
+    the Basic Offset Table Item, which appears
+    to have a length that depends on the total number
+    of frames. Can be confusing if the first one has
+    a very different length to the rest.
+    """
+    nif = perlabelstuff['original']
+    isoidx = check_isotropy(nif)
+    otheridx = [0, 1, 2]
+    otheridx.remove(isoidx)
+    labelframe = list()
+
+    for labidx in range(len(perlabelstuff["rois"])):
+        roi = perlabelstuff["rois"][labidx]
+        sz = roi.GetSize()
+        for slce in range(sz[isoidx]):
+            selector = mk_indexing_tuple(slce, isoidx)
+            roislice = roi[selector]
+            slicedat = sitk.GetArrayFromImage(roislice)
+            rledat = (pydi.pixel_data_handlers.
+                      rle_handler.rle_encode_frame(slicedat))
+
+            labelframe.append(rledat)
+
+    return(pydi.encaps.encapsulate(labelframe,
+                                   fragments_per_frame=1, has_bot=True))
+
+
+def find_match_im(labelfile, nidetails):
+    """ Figure out which image the label mask
+    was derived from.
+    """
+    nif = sitk.ReadImage(labelfile, sitk.sitkUInt8)
+    spacing = nif.GetSpacing()
+    oMatrix = nif.GetDirection()
+    imsize = nif.GetSize()
+
+    def within_tol(t1, t2):
+        t1a = np.array(t1)
+        t2a = np.array(t2)
+        d = np.abs(t1a - t2a)
+        return d.max() < 0.0001
+
+    for i in range(len(nidetails)):
+        sp = nidetails[i]["spacing"]
+        sz = nidetails[i]["size"]
+        mt = nidetails[i]["matrix"]
+        if (within_tol(spacing, sp) and
+           within_tol(imsize, sz) and
+           within_tol(oMatrix, mt)):
+            return i
+    return None
+
+
+def mk_label_segment_sequence(imname, labs):
+    """
+    Hardcoded stuff indicating that the mask/labels are imported
+    """
+    segment_sequence = pydi.Sequence()
+
+    for labnum in range(len(labs)):
+        # Segment Sequence: Segment 1
+        seg1 = pydi.Dataset()
+
+        # Anatomic Region Sequence
+        anatomic_region_sequence = pydi.Sequence()
+        seg1.AnatomicRegionSequence = anatomic_region_sequence
+
+        # Anatomic Region Sequence: Anatomic Region 1
+        anatomic_region1 = pydi.Dataset()
+        anatomic_region1.CodeValue = 'T-D0010'
+        anatomic_region1.CodingSchemeDesignator = 'SRT'
+        anatomic_region1.CodeMeaning = 'Entire body'
+        anatomic_region_sequence.append(anatomic_region1)
+
+        # Segmented Property Category Code Sequence
+        seg_property_category_code_sequence = pydi.Sequence()
+        seg1.SegmentedPropertyCategoryCodeSequence = (
+            seg_property_category_code_sequence)
+
+        # Segmented Property Category Code Sequence:
+        # Segmented Property Category Code 1
+        seg_property_category_code1 = pydi.Dataset()
+        seg_property_category_code1.CodeValue = 'T-D000A'
+        seg_property_category_code1.CodingSchemeDesignator = 'SRT'
+        seg_property_category_code1.CodeMeaning = 'Anatomical Structure'
+        seg_property_category_code_sequence.append(seg_property_category_code1)
+
+        seg1.SegmentNumber = labnum + 1
+        seg1.SegmentLabel = imname + " label " + str(labs[labnum])
+        seg1.SegmentDescription = ("Label " +
+                                   str(labs[labnum]) +
+                                   " of " + imname)
+        seg1.SegmentAlgorithmType = 'AUTOMATIC'
+        seg1.SegmentAlgorithmName = 'Unknown'
+        seg1.RecommendedDisplayCIELabValue = lookup_cie(labs[labnum])
+        # Segmented Property Type Code Sequence
+        segmented_property_type_code_sequence = pydi.Sequence()
+        seg1.SegmentedPropertyTypeCodeSequence = (
+            segmented_property_type_code_sequence)
+
+        # Segmented Property Type Code Sequence: Segmented Property Type Code 1
+        segmented_property_type_code1 = pydi.Dataset()
+        segmented_property_type_code1.CodeValue = '111176'
+        segmented_property_type_code1.CodingSchemeDesignator = 'DCM'
+        segmented_property_type_code1.CodeMeaning = 'Unspecified'
+        segmented_property_type_code_sequence.append(
+            segmented_property_type_code1)
+        segment_sequence.append(seg1)
+
+    return segment_sequence
+
+
+def sitk_labelnifti_to_dicom(niftifile, dicomfile,
+                             outputfile, seriesNum=0,
+                             Description=None, StudyUID=None, FrameUID=None,
+                             UIDlist=None, SeriesNum=None):
+    """
+    :param niftifile: (string) path to nifti image - this is expected
+                         to be a label image. Each label will be rendered
+                         in a different colour in brainlab. Binary
+                         images (masks) are also fine.
+    :param dicomfile: (string) path to a dicom file - used to supply some
+                   important tags
+    :param outputprefix: (string) output filename.
+    :param Description: (string) to populate the SeriesDescription field.
+    :param StudyUID: (string) Study Instance UID - will generate one
+                          if none.
+    :param FrameUID: (string) a UID that should be common for all
+                 dicoms in a common space
+    :param SeriesNum: (int) unique within a study - helps identify
+                  files in a series
+    :param UIDlist: the set of dicom UIDs corresponding to the volume
+                    used to create the segmentation
+    :return: tuple of list of strings containing InstanceUIDs for
+        constructing other dicoms and the dicom
+        structure containing the common parts.
+    Notes :
+    This function creates the special dicom format used by brainlab "objects".
+    Useful for rendering masks, such as tumour segmentations,
+    functional activation, etc.
+    """
+    # generate a useful name
+    imname = os.path.basename(niftifile)
+    imname = os.path.splitext(imname)[0]
+    # again in case nifti files are compressed
+    imname = os.path.splitext(imname)[0]
+
+    # Read in as float and rescale to UInt16, with rescale values
+    nif = sitk.ReadImage(niftifile, sitk.sitkUInt8)
+    spacing = nif.GetSpacing()
+    oMatrix = nif.GetDirection()
+    imsize = nif.GetSize()
+
+    if len(spacing) > 3:
+        raise ValueError('Higher than 3D nifti file - stopping')
+
+    perlabelstuff = process_label_imA(nif)
+
+    # figure out which plane to write. Aiming for isotropic within plane
+    # If image is isotropic, should use minimum number of planes
+    isoidx = check_isotropy(nif)
+    otheridx = [0, 1, 2]
+    otheridx.remove(isoidx)
+
+    modification_time = time.strftime("%H%M%S", time.localtime())
+    modification_date = time.strftime("%Y%m%d", time.localtime())
+
+    # Columns of this matrix contain the direction cosines
+    # matrix is stored in rows
+    direction = get_direction(nif, isoidx)
+    direction = str2ds(direction)
+    sp = nif.GetSpacing()
+    sp = str2ds(sp)
+    spacing = [sp[i] for i in otheridx]
+    slthickness = sp[isoidx]
+
+    # Load the sample dicom
+    # create basics of dicom
+    dicomtemplate = pydi.read_file(dicomfile)
+
+    labeldcm = dicom_label_skel()
+    labeldcm = dicom_patient_stuff(labeldcm, dicomtemplate)
+    labeldcm = dicom_date_stamps(labeldcm, niftifile)
+    labeldcm.file_meta = mk_filemeta_labelobj()
+    labeldcm.is_little_endian = True
+    labeldcm.is_implicit_VR = False
+    labeldcm.SOPInstanceUID = \
+        labeldcm.file_meta.MediaStorageSOPInstanceUID
+    labeldcm.SOPClassUID = labeldcm.file_meta.MediaStorageSOPClassUID
+    labeldcm.SeriesNumber = 877 + seriesNum
+    labeldcm.ImageType = "DERIVED\\PRIMARY"
+    labeldcm.SegmentationFractionalType = "PROBABILITY"
+    labeldcm.MaximumFractionalValue = 255
+    labeldcm.ContentDescription = b'Nifti segmentation objects'
+    if StudyUID is not None:
+        labeldcm.StudyInstanceUID = StudyUID
+    if UIDlist is not None:
+        # Add the references to a dicom volume
+        labeldcm.ReferencedSeriesSequence = \
+            dicom_referenced_series_sequence(
+                UIDlist,
+                dicomtemplate.SeriesInstanceUID)
+    else:
+        raise MissingUIDList
+
+    if FrameUID is not None:
+        labeldcm.FrameOfReferenceUID = FrameUID
+    if Description is not None:
+        labeldcm.SeriesDescription = Description
+
+    labeldcm.DimensionOrganizationType = '3D'
+    labeldcm.SamplesPerPixel = 1
+    labeldcm.PhotometricInterpretation = 'MONOCHROME2'
+
+    cropsize = perlabelstuff["cropped"].GetSize()
+
+    totalframes = count_total_frames(perlabelstuff, isoidx)
+    labeldcm.NumberOfFrames = totalframes
+    labeldcm.Rows = int(cropsize[otheridx[1]])
+    labeldcm.Columns = int(cropsize[otheridx[0]])
+    labeldcm.BitsAllocated = 8
+    labeldcm.BitsStored = 8
+    labeldcm.HighBit = 7
+    labeldcm.PixelRepresentation = 0
+    labeldcm.LossyImageCompression = '00'
+    labeldcm.SegmentationType = 'FRACTIONAL'
+
+    # Dimension organisation
+    # - uses macros (0062,0004) - segment number
+    #               (0062,0002) - segment sequence
+    #                   (tag for a sequence that comes next)
+    #               (0020,0032) - image position patient
+    #               (0020,9113) - plane position sequence
+    dos = pydi.Sequence()
+    do1 = pydi.Dataset()
+    do1.DimensionOrganizationUID = dcm_uuid()
+    dos.append(do1)
+    labeldcm.DimensionOrganizationSequence = dos
+
+    dis = pydi.Sequence()
+    di1 = pydi.Dataset()
+    di1.DimensionOrganizationUID = do1.DimensionOrganizationUID
+    di1.DimensionIndexPointer = pydi.tag.Tag(0x0062, 0x0004)
+    di1.FunctionalGroupPointer = pydi.tag.Tag(0x0062, 0x0002)
+    dis.append(di1)
+
+    di2 = pydi.Dataset()
+    di2.DimensionOrganizationUID = do1.DimensionOrganizationUID
+    di2.DimensionIndexPointer = pydi.tag.Tag(0x0020, 0x0032)
+    di2.FunctionalGroupPointer = pydi.tag.Tag(0x0020, 0x9113)
+    dis.append(di2)
+
+    labeldcm.DimensionIndexSequence = dis
+    labeldcm.DimensionOrganizationType = "3D"
+
+    # Segmentation sequence
+    labeldcm.SegmentSequence = (
+        mk_label_segment_sequence(imname, perlabelstuff["labels"]))
+
+    # Shared Functional Groups Sequence - do we need this
+    # Brainlab and slicer version have an image orientation patient inside it
+
+    labeldcm.SharedFunctionalGroupsSequence = \
+        mk_shared_functional_group(nif, UIDlist)
+
+    # Per-frame functional groups sequence - contains segment number,
+    # frame number and position. This is where a lot of the action is.
+    labeldcm.PerFrameFunctionalGroupsSequence = (
+        mk_perframe_functional_group(perlabelstuff, UIDlist))
+    # Pixels at the end - encapsulated form
+
+    labeldcm.PixelData = mk_rle_data(perlabelstuff)
+    labeldcm["PixelData"].VR = 'OB'
+    labeldcm["PixelData"].is_undefined_length = True
+
+    pydi.filewriter.dcmwrite(outputfile, labeldcm,
+                             write_like_original=False)
+
+
+########################################################################
+# Driver scripts to import collections of nifti and tract files
+
+
+def import_tractography_study(origdcm, niftifiles,
+                              tckfiles, labelfiles=None,
+                              destdir="./",
+                              StudyUID=None, FrameUID=None):
     """
     Create a dicom study for brainlab from nifti and tck files.
     The first nifti file will be used as the reference.
@@ -1496,21 +2089,51 @@ def import_tractography_study(origdcm, niftifiles, tckfiles, destdir="./",
 
     nidetails = [
         sitk_nifti_to_dicom(niftifile=niftifiles[idx], dicomfile=origdcm,
-                        dcmprefix="IM",
-                        outdir=n_dir[idx], Description=n_cn[idx],
-                        StudyUID=StudyUID, FrameUID=FrameUID,
-                        SeriesNum=idx + 1) for idx in
+                            dcmprefix="IM",
+                            outdir=n_dir[idx], Description=n_cn[idx],
+                            StudyUID=StudyUID, FrameUID=FrameUID,
+                            SeriesNum=idx + 1) for idx in
         range(len(niftifiles))]
 
     tckdetails = [tck_to_dicom(tckfile=tckfiles[idx],
-                            dicomfile=nidetails[0]['dcmfiles'][0],
-                            outputfile=t_dir[idx],
-                            seriesNum=idx + len(nidetails) + 10,
-                            Description=t_cn[idx],
-                            StudyUID=StudyUID,
-                            UIDlist=nidetails[0]['SOPlist'],
-                            FrameUID=FrameUID) for idx in
+                               dicomfile=nidetails[0]['dcmfiles'][0],
+                               outputfile=t_dir[idx],
+                               seriesNum=idx + len(nidetails) + 10,
+                               Description=t_cn[idx],
+                               StudyUID=StudyUID,
+                               UIDlist=nidetails[0]['SOPlist'],
+                               FrameUID=FrameUID) for idx in
                   range(len(tckfiles))]
+
+    if labelfiles is not None:
+        # now for label images
+        ln_bn = [os.path.basename(x) for x in labelfiles]
+        ln_cn = [os.path.splitext(x)[0] for x in ln_bn]
+        ln_cn = [os.path.splitext(x)[0] for x in ln_cn]
+
+        ln_dir = [os.path.join(destdir, x) for x in ln_cn]
+
+        [os.makedirs(x, exist_ok=True) for x in ln_dir]
+        ln_dir = [os.path.join(x, "LB.dcm") for x in ln_dir]
+
+        # figure out which image that we've already converted
+        # matches the label image
+        # We end up loading the niftifile again.
+        for idx in range(len(labelfiles)):
+            nif_index = find_match_im(labelfiles[idx], nidetails)
+
+            if nif_index is None:
+                raise RawToLabelImMismatch
+            
+            sitk_labelnifti_to_dicom(
+                labelfiles[idx],
+                dicomfile=nidetails[nif_index]['dcmfiles'][0],
+                outputfile=ln_dir[idx],
+                Description=ln_cn[idx],
+                StudyUID=StudyUID,
+                UIDlist=nidetails[nif_index]['SOPlist'],
+                FrameUID=FrameUID)
+
     return [n_dir, t_dir]
 
 
@@ -1541,7 +2164,7 @@ def get_already_converted_info(origdcmfolder):
 
 
 def append_imaging_study(origdcmfolder, niftifiles, studystart,
-                       destdir="./"):
+                         destdir="./"):
     """
     Convert more niftis, with FrameID etc coming from
     a previous conversion
@@ -1566,10 +2189,10 @@ def append_imaging_study(origdcmfolder, niftifiles, studystart,
     # SOPlist = [x['SOPInstance'] for x in alldetails]
     nidetails = [
         sitk_nifti_to_dicom(niftifile=niftifiles[idx], dicomfile=dcms[0],
-                        dcmprefix="IM",
-                        outdir=n_dir[idx], Description=n_cn[idx],
-                        StudyUID=StudyUID, FrameUID=FrameUID,
-                        SeriesNum=idx + studystart) for idx in
+                            dcmprefix="IM",
+                            outdir=n_dir[idx], Description=n_cn[idx],
+                            StudyUID=StudyUID, FrameUID=FrameUID,
+                            SeriesNum=idx + studystart) for idx in
         range(len(niftifiles))]
 
 
@@ -1595,12 +2218,12 @@ def append_tractography_study(origdcmfolder, tckfiles, destdir="./"):
 
     SOPlist = [x['SOPInstance'] for x in alldetails]
     tckdetails = [tck_to_dicom(tckfile=tckfiles[idx], dicomfile=dcms[0],
-                            outputfile=t_dir[idx],
-                            seriesNum=idx + 50 + 10,
-                            Description="Fiber Bundles",
-                            StudyUID=alldetails[0]['StudyUID'],
-                            UIDlist=SOPlist,
-                            FrameUID=alldetails[0]['FrameUID']) for idx
+                               outputfile=t_dir[idx],
+                               seriesNum=idx + 50 + 10,
+                               Description="Fiber Bundles",
+                               StudyUID=alldetails[0]['StudyUID'],
+                               UIDlist=SOPlist,
+                               FrameUID=alldetails[0]['FrameUID']) for idx
                   in range(len(tckfiles))]
     print(alldetails)
     return tckdetails
@@ -1655,5 +2278,3 @@ def fix_dwi_shell(origdcmfolder, desiredB, destdir="./", b0thresh=150):
     bv = [changeUIDs(x, StudyUID, SeriesUID) for x in bv]
     saveDCMlist(destdir, bv)
     return bv
-
-
