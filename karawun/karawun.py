@@ -83,6 +83,12 @@ class RawToLabelImMismatch(Error):
    """Raised when one of the label images doesn't match any of the raw"""
    pass
 
+def exception_handler(exception_type, exception, traceback):
+    # All your trace are belong to us!
+    # your format
+    print ("Exception handler: %s - %s" %(exception_type.__name__, exception))
+
+sys.excepthook = exception_handler
 
 # mrtrix tckfile stuff
 # converts the MIF datatypes
@@ -949,11 +955,16 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
     imsize = nif.GetSize()
 
     if len(spacing) > 3:
-        raise ValueError('Higher than 3D nifti file - stopping')
+        raise ValueError(niftifile + ': Higher than 3D nifti file - stopping')
 
     # figure out which plane to write. Aiming for isotropic within plane
     # If image is isotropic, should use minimum number of planes
-    isoidx = check_isotropy(nif)
+    try:
+        isoidx = check_isotropy(nif)
+    except:
+        print("Error processing " + niftifile)
+        raise
+    
     otheridx = [0, 1, 2]
     otheridx.remove(isoidx)
     # Load the sample dicom
@@ -1913,11 +1924,15 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
     if len(spacing) > 3:
         raise ValueError('Higher than 3D nifti file - stopping')
 
-    perlabelstuff = process_label_imA(nif)
+    try:
+        perlabelstuff = process_label_imA(nif)
 
-    # figure out which plane to write. Aiming for isotropic within plane
-    # If image is isotropic, should use minimum number of planes
-    isoidx = check_isotropy(nif)
+        # figure out which plane to write. Aiming for isotropic within plane
+        # If image is isotropic, should use minimum number of planes
+        isoidx = check_isotropy(nif)
+    except:
+        print("Error processing " + niftifile)
+        raise
     otheridx = [0, 1, 2]
     otheridx.remove(isoidx)
 
@@ -2078,14 +2093,6 @@ def import_tractography_study(origdcm, niftifiles,
     n_dir = [os.path.join(destdir, x) for x in n_cn]
     # paste series number?
 
-    # and for tck files
-    t_bn = [os.path.basename(x) for x in tckfiles]
-    t_cn = [os.path.splitext(x)[0] for x in t_bn]
-    t_dir = [os.path.join(destdir, x) for x in t_cn]
-
-    [os.makedirs(x, exist_ok=True) for x in t_dir]
-
-    t_dir = [os.path.join(x, "FT_00.dcm") for x in t_dir]
 
     nidetails = [
         sitk_nifti_to_dicom(niftifile=niftifiles[idx], dicomfile=origdcm,
@@ -2095,7 +2102,18 @@ def import_tractography_study(origdcm, niftifiles,
                             SeriesNum=idx + 1) for idx in
         range(len(niftifiles))]
 
-    tckdetails = [tck_to_dicom(tckfile=tckfiles[idx],
+    # and for tck files
+    t_dir = None
+    if tckfiles is not None:
+        t_bn = [os.path.basename(x) for x in tckfiles]
+        t_cn = [os.path.splitext(x)[0] for x in t_bn]
+        t_dir = [os.path.join(destdir, x) for x in t_cn]
+
+        [os.makedirs(x, exist_ok=True) for x in t_dir]
+
+        t_dir = [os.path.join(x, "FT_00.dcm") for x in t_dir]
+        
+        tckdetails = [tck_to_dicom(tckfile=tckfiles[idx],
                                dicomfile=nidetails[0]['dcmfiles'][0],
                                outputfile=t_dir[idx],
                                seriesNum=idx + len(nidetails) + 10,
