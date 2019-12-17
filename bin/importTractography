@@ -18,6 +18,13 @@
 import os
 import karawun
 import argparse
+import sys
+
+
+def exception_handler(exception_type, exception, traceback):
+    # All your trace are belong to us!
+    # your format
+    print ("Exception handler: %s - %s" %(exception_type.__name__, exception))
 
 
 def is_readable_file(parser, arg):
@@ -62,6 +69,11 @@ parser.add_argument("-l", "--label-files", nargs="+",
                     required=False,
                     help="One or more nifti label image files")
                     
+parser.add_argument("-v", "--verbose",
+                    action='store_true',
+                    required=False,
+                    help="verbose errors, python traceback")
+
 
 def run_cli(args):
     try:
@@ -74,6 +86,12 @@ def run_cli(args):
         print("One of the label images is not derived from any of the raw images")
     except karawun.MissingUIDList:
         print("A UID list is required iternally somewhere - this error shouldn't happen")
+
+
+
 if __name__ == '__main__':
     args=parser.parse_args()
+    if not args.verbose:
+        sys.excepthook = exception_handler
+
     run_cli(args)
