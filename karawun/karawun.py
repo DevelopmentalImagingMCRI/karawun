@@ -83,13 +83,6 @@ class RawToLabelImMismatch(Error):
    """Raised when one of the label images doesn't match any of the raw"""
    pass
 
-def exception_handler(exception_type, exception, traceback):
-    # All your trace are belong to us!
-    # your format
-    print ("Exception handler: %s - %s" %(exception_type.__name__, exception))
-
-sys.excepthook = exception_handler
-
 # mrtrix tckfile stuff
 # converts the MIF datatypes
 # Bit    bitwise data
