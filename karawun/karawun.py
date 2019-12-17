@@ -860,13 +860,20 @@ def check_isotropy(sitkImage):
        layed out in MNI space, this function will return 2,
        because sitkImage[:,:, 5] would return an isotropic
        slice and the "5" corresponds to image dimension 2.
-        """
+
+       Now rounding to 6 decimal places before selecting the
+       plane to use. Rounding is only used in plane selection.
+       Original dimensions used in writing dicoms.
+       """
     spacing = sitkImage.GetSpacing()
     sparray = np.array(spacing)
-    spu = np.unique(sparray)
+    # round to 6 decimal 
+    spu = np.unique(np.around(sparray, 6))
     if np.unique(spu).ravel().shape[0] == 3:
-        raise ValueError('No plane with isotropic voxels - stopping')
+        message='No plane with isotropic voxels - stopping - {},{},{}'.format(sparray[0], sparray[1], sparray[2])
+        raise ValueError(message)
 
+    sparray = np.around(sparray, 6)
     sb = sparray == sparray[0]
     if np.all(sb):
         dimensions = sitkImage.GetSize()
