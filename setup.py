@@ -1,11 +1,11 @@
 from setuptools import setup
 
 LONG_DESCRIPTION = \
-'''Converts nifti files (raw and mask) and mrtrix tck files to DICOM format readable by Brainlab surgical planning and navigation systems. Tck files are converted to 3D objects that can be manipulated by Brainlab tools'''
+'''Converts nifti files (raw and mask) and mrtrix tck files to DICOM format readable by Brainlab surgical planning and navigation systems. Tck files are converted to 3D objects that can be manipulated by Brainlab tools. Label images are converted to a dicom segmentation format and can also be manipulated as 3D objects in Brainlab'''
 
 setup(
     name='karawun',
-    version='0.1.0.0',
+    version='0.2.0.0',
     packages=['karawun'],
     python_requires='>=3.6',
     package_dir={'karawun': 'karawun'},
