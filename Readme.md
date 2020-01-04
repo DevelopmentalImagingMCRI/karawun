@@ -44,12 +44,16 @@ with miniconda is illustrated below:
 
 1. [Install miniconda for python 3.7](https://docs.conda.io/en/latest/miniconda.html)
 
+   Subsequent commands need to be entered in a commandline shell - either the anaconda shell under windows or the terminal under Linux or Mac.
+   
 1. Add package channels:
     ```bash
-    conda config --append channels conda-forge \
-    --append channels anaconda \
-    --append channels SimpleITK
+    conda config --append channels conda-forge --append channels anaconda --append channels SimpleITK
     ```
+1. For Windows:
+   ```bash
+   conda install git
+   ```    
 1. Create a conda environment (using a name of your own choice) and install the dependencies:
     ```bash
     conda create --name KarawunEnv --file https://github.com/DevelopmentalImagingMCRI/karawun/raw/master/requirements.txt
