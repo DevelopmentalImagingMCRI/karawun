@@ -6,7 +6,7 @@ LONG_DESCRIPTION = \
 
 setup(
     name='karawun',
-    version='0.2.0.0',
+    version='0.2.0.1',
     packages=['karawun'],
     python_requires='>=3.6',
     package_dir={'karawun': 'karawun'},
