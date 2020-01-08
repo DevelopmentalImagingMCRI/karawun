@@ -1,3 +1,4 @@
+import setuptools
 from setuptools import setup
 
 LONG_DESCRIPTION = \
@@ -5,7 +6,7 @@ LONG_DESCRIPTION = \
 
 setup(
     name='karawun',
-    version='0.2.0.0',
+    version='0.2.0.1',
     packages=['karawun'],
     python_requires='>=3.6',
     package_dir={'karawun': 'karawun'},
@@ -18,6 +19,6 @@ setup(
     install_requires=["numpy==1.13.0",
                       "pydicom==1.3",
                       "SimpleITK==1.2.0"],
-    scripts=['bin/importTractography']
+    entry_points={'console_scripts': ['importTractography = karawun.commandline:import_tractography_cl']}
 )
 

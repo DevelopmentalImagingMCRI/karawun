@@ -89,7 +89,7 @@ def run_cli(args):
 
 
 
-if __name__ == '__main__':
+def import_tractography_cl():
     args=parser.parse_args()
     if not args.verbose:
         sys.excepthook = exception_handler
