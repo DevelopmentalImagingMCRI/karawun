@@ -178,7 +178,8 @@ def load_trackfile(fileName, origVectorMode=False):
     :param origVectorMode: if True, load the file in one go.
     otherwise do by block. Saves a bit of ram
     :return: dict with the following keys
-         "init_threshold": the lowest FA to initialise tracks
+         "init_threshold": the lowest FA to initialise tracks- can 
+                           be "variable" when tckfiles are combined
          "lmax": the spherical harmonic order
          "max_dist": maximum length of any tracts
          "max_num_attempts": maximum number of tracts sent out
@@ -191,10 +192,13 @@ def load_trackfile(fileName, origVectorMode=False):
          "sh_precomputed": Legendre polynomials precomputed?
          "source": tensor or CSD image used for tracking
          "step_size": pixel step size
-         "stop_when_included": whether we stopped when we went intoq
-                               an include zone
-         "threshold": FA threshold
-         "unidirectional": whether we sent out in one direction
+         "stop_when_included": whether we stopped when we went into
+                               an include zone - can  be "variable" 
+                               when tckfiles are combined
+         "threshold": FA threshold- can 
+                      be "variable" when tckfiles are combined
+         "unidirectional": whether we sent out in one direction - can 
+                           be "variable" when tckfiles are combined
          "roi":
             "type (list of strings)": seed or mask
             "file (list of strings)": filenames
@@ -264,17 +268,23 @@ def load_trackfile(fileName, origVectorMode=False):
                         if curKeyword in ['init_threshold', 'max_dist',
                                           'min_curv', 'min_dist',
                                           'step_size', 'threshold']:
-                            trackStruct[curKeyword] = float(curValue)
+                            try:
+                                trackStruct[curKeyword] = float(curValue)
+                            except ValueError:
+                                trackStruct[curKeyword] = curValue
                         elif curKeyword in ['lmax', 'max_num_attempts',
                                             'max_num_tracks',
                                             'max_trials',
                                             'no_mask_interp',
                                             'sh_precomputed',
                                             'threshold',
-                                            'unidirectional',
                                             'count',
+                                            'unidirectional',
                                             'total_count']:
-                            trackStruct[curKeyword] = int(curValue)
+                            try:
+                                trackStruct[curKeyword] = int(curValue)
+                            except ValueError:
+                                trackStruct[curKeyword] = curValue
                         elif curKeyword in ['method', 'source',
                                             'mrtrix_version']:
                             trackStruct[curKeyword] = curValue[:]
