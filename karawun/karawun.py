@@ -280,6 +280,7 @@ def load_trackfile(fileName, origVectorMode=False):
                                             'threshold',
                                             'count',
                                             'unidirectional',
+                                            'stop_when_included',
                                             'total_count']:
                             try:
                                 trackStruct[curKeyword] = int(curValue)
