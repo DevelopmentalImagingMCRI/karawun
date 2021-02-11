@@ -1,5 +1,5 @@
 pytest
-numpy==1.13.0
+numpy
 pydicom==1.3
 SimpleITK==1.2.0
 pip
