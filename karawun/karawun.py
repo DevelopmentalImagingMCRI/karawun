@@ -1081,7 +1081,7 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
 
         # Finally - pixel data
         P = sitk.GetArrayFromImage(image_slice)
-        thisslice.PixelData = P.tostring()
+        thisslice.PixelData = P.tobytes()
         fname = dcmprefix + "_" + format(i, "04") + ".dcm"
         fname = os.path.join(outdir, fname)
         pydi.filewriter.dcmwrite(fname, thisslice,
@@ -1241,7 +1241,7 @@ def mrtrix2surf(tck):
     # coordinate transform between mrtrix/nifti and dicom
     tf = np.array([-1, 0, 0, 0, -1, 0, 0, 0, 1])
     tf = tf.reshape(3, 3)
-    streamlines_dc = [np.array(tf * np.matrix(h)) for h in
+    streamlines_dc = [np.array(tf @ np.array(h)) for h in
                       tck['tracks']]
     points_dc = [np.r_[0:x.shape[1]] + 1 for x in streamlines_dc]
 
@@ -1322,7 +1322,7 @@ def mk_surface_sequence(coords, indexes, chk):
     def onePtIdxList(idxs):
         PL = pydi.Dataset()
         a = np.array(idxs, dtype=np.uint16)
-        PL.PrimitivePointIndexList = a.tostring()
+        PL.PrimitivePointIndexList = a.tobytes()
         return PL
 
     j = [onePtIdxList(x) for x in indexes]
