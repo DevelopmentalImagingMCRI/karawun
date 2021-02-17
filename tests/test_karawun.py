@@ -26,6 +26,7 @@ import hashlib
 import json
 
 import karawun.karawun
+from pathlib import Path, PurePosixPath
 
 # pytest tests/
 
@@ -72,6 +73,7 @@ def get_all_sha512(location):
             shalist = [get_sha512(f) for f in thesefiles]
             # Remove the location component
             relfiles = [os.path.relpath(f, location) for f in thesefiles]
+            relfiles = [str(PurePosixPath(Path(f))) for f in relfiles]
             z = zip(relfiles, shalist)
             shadict.update(dict(z))
 

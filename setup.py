@@ -6,7 +6,7 @@ LONG_DESCRIPTION = \
 
 setup(
     name='karawun',
-    version='0.2.0.1',
+    version='0.2.0.2',
     packages=['karawun'],
     python_requires='>=3.6',
     package_dir={'karawun': 'karawun'},
@@ -16,7 +16,7 @@ setup(
     author_email='richard.beare@mcri.edu.au',
     description=('DICOM image, segmgmentation image and fibre object converter'),
     long_description=(LONG_DESCRIPTION),
-    install_requires=["numpy==1.13.0",
+    install_requires=["numpy>=1.13.0",
                       "pydicom==1.3",
                       "SimpleITK==1.2.0"],
     entry_points={'console_scripts': ['importTractography = karawun.commandline:import_tractography_cl']}
