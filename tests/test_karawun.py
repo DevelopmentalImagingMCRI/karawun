@@ -17,10 +17,8 @@ import pytest
 import uuid
 
 from unittest import mock
-import glob
 import karawun
 import time
-import tempfile
 import os
 import hashlib
 import json
@@ -98,7 +96,8 @@ def converter(targetd):
                                       labelfiles=None,
                                       destdir=targetd)
 
-    # test routines
+
+# test routines
 def label_converter(targetd):
     test_data = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), 'Data')
@@ -110,7 +109,7 @@ def label_converter(targetd):
     MR = [os.path.join(test_data, "Tractography", nii) for nii in MR]
     MR_LAB = ['words.nii.gz', 'globes.nii.gz']
     MR_LAB = [os.path.join(test_data, "Tractography", nii) for nii in MR_LAB]
-    
+
     TCK = ['Left_PT_final.tck', 'Right_PT_final.tck']
     TCK = [os.path.join(test_data, "Tractography", tck) for tck in TCK]
     karawun.import_tractography_study(origdcm=t1dcm,
@@ -118,6 +117,7 @@ def label_converter(targetd):
                                       tckfiles=TCK,
                                       labelfiles=MR_LAB,
                                       destdir=targetd)
+
 
 def label_converter_fail(targetd):
     # This should fail as there is no
@@ -131,7 +131,7 @@ def label_converter_fail(targetd):
     MR = [os.path.join(test_data, "Tractography", nii) for nii in MR]
     MR_LAB = ['words.nii.gz', 'globes.nii.gz']
     MR_LAB = [os.path.join(test_data, "Tractography", nii) for nii in MR_LAB]
-    
+
     TCK = ['Left_PT_final.tck', 'Right_PT_final.tck']
     TCK = [os.path.join(test_data, "Tractography", tck) for tck in TCK]
     karawun.import_tractography_study(origdcm=t1dcm,
@@ -178,9 +178,11 @@ def test_conv2(dcm_uuid, localtime, tmp_path):
     f.close()
     assert(baselinesha == this_sha512)
 
+
 def test_conv3(tmp_path):
     with pytest.raises(Exception):
         label_converter_fail(tmp_path)
+
 
 def mkSha(pth, jso):
     baselined = os.path.join(
@@ -200,7 +202,7 @@ def test_create_baseline_shaA(dcm_uuid, localtime, tmp_path):
     print("Creating baseline checksums for images+tractography")
     converter(tmp_path)
     mkSha(tmp_path, "image_sha512.json")
-    
+
 
 @pytest.mark.createbaseline
 @mock.patch('time.localtime', side_effect=patchLocalTime)
@@ -208,5 +210,3 @@ def test_create_baseline_shaA(dcm_uuid, localtime, tmp_path):
 def test_create_baseline_shaB(dcm_uuid, localtime, tmp_path):
     label_converter(tmp_path)
     mkSha(tmp_path, "seg_sha512.json")
-
-    

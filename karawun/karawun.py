@@ -27,8 +27,6 @@ import SimpleITK as sitk
 import numpy as np
 import time
 import os
-import sys
-import errno
 import uuid
 import os.path
 
@@ -73,15 +71,21 @@ else:
 nice_colours_cie = [ciedicom.rgb2DicomLab(col) for
                     col in ciedicom.nice_colours_rgb]
 
+
 class Error(Exception):
-   """Base class for other exceptions"""
-   pass
+    """Base class for other exceptions"""
+    pass
+
+
 class MissingUIDList(Error):
-   """Raised when the required UID list is missing"""
-   pass
+    """Raised when the required UID list is missing"""
+    pass
+
+
 class RawToLabelImMismatch(Error):
-   """Raised when one of the label images doesn't match any of the raw"""
-   pass
+    """Raised when one of the label images doesn't match any of the raw"""
+    pass
+
 
 # mrtrix tckfile stuff
 # converts the MIF datatypes
@@ -178,7 +182,7 @@ def load_trackfile(fileName, origVectorMode=False):
     :param origVectorMode: if True, load the file in one go.
     otherwise do by block. Saves a bit of ram
     :return: dict with the following keys
-         "init_threshold": the lowest FA to initialise tracks- can 
+         "init_threshold": the lowest FA to initialise tracks- can
                            be "variable" when tckfiles are combined
          "lmax": the spherical harmonic order
          "max_dist": maximum length of any tracts
@@ -193,11 +197,11 @@ def load_trackfile(fileName, origVectorMode=False):
          "source": tensor or CSD image used for tracking
          "step_size": pixel step size
          "stop_when_included": whether we stopped when we went into
-                               an include zone - can  be "variable" 
+                               an include zone - can  be "variable"
                                when tckfiles are combined
-         "threshold": FA threshold- can 
+         "threshold": FA threshold- can
                       be "variable" when tckfiles are combined
-         "unidirectional": whether we sent out in one direction - can 
+         "unidirectional": whether we sent out in one direction - can
                            be "variable" when tckfiles are combined
          "roi":
             "type (list of strings)": seed or mask
@@ -878,10 +882,10 @@ def check_isotropy(sitkImage):
        """
     spacing = sitkImage.GetSpacing()
     sparray = np.array(spacing)
-    # round to 6 decimal 
+    # round to 6 decimal
     spu = np.unique(np.around(sparray, 6))
     if np.unique(spu).ravel().shape[0] == 3:
-        message='No plane with isotropic voxels - stopping - {},{},{}'.format(sparray[0], sparray[1], sparray[2])
+        message = 'No plane with isotropic voxels - stopping - {},{},{}'.format(sparray[0], sparray[1], sparray[2])
         raise ValueError(message)
 
     sparray = np.around(sparray, 6)
@@ -961,6 +965,11 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
 
     # Read in as float and rescale to UInt16, with rescale values
     nif = sitk.ReadImage(niftifile, sitk.sitkFloat32)
+    # check the qform
+    qformname = nif.GetMetaData('qform_code_name')
+    if qformname == 'NIFTI_XFORM_UNKNOWN':
+        raise ValueError(niftifile + ': Unknown qform code - stopping')
+    
     spacing = nif.GetSpacing()
     oMatrix = nif.GetDirection()
     imsize = nif.GetSize()
@@ -972,16 +981,15 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
     # If image is isotropic, should use minimum number of planes
     try:
         isoidx = check_isotropy(nif)
-    except:
+    except ValueError:
         print("Error processing " + niftifile)
         raise
-    
+
     otheridx = [0, 1, 2]
     otheridx.remove(isoidx)
     # Load the sample dicom
     t1d = pydi.read_file(dicomfile)
 
-    writer = sitk.ImageFileWriter()
     modification_time = time.strftime("%H%M%S", time.localtime())
     modification_date = time.strftime("%Y%m%d", time.localtime())
 
@@ -1539,11 +1547,11 @@ def process_label_im(im):
     otheridx = [0, 1, 2]
     otheridx.remove(isoidx)
 
-    direction = get_direction(im, isoidx)
-    sp = im.GetSpacing()
-    sp = str2ds(sp)
-    spacing = [sp[i] for i in otheridx]
-    slthickness = sp[isoidx]
+    # direction = get_direction(im, isoidx)
+    # sp = im.GetSpacing()
+    # sp = str2ds(sp)
+    # spacing = [sp[i] for i in otheridx]
+    # slthickness = sp[isoidx]
 
     labstats = sitk.LabelShapeStatisticsImageFilter()
     labstats.Execute(im)
@@ -1570,8 +1578,8 @@ def process_label_im(im):
 
 def count_total_frames(perlabelstuff, isoidx):
     totalframes = 0
-    for l in range(len(perlabelstuff['rois'])):
-        sz = perlabelstuff['rois'][l].GetSize()
+    for lab in range(len(perlabelstuff['rois'])):
+        sz = perlabelstuff['rois'][lab].GetSize()
         totalframes += sz[isoidx]
     return totalframes
 
@@ -1590,11 +1598,11 @@ def process_label_imA(im):
     otheridx = [0, 1, 2]
     otheridx.remove(isoidx)
 
-    direction = get_direction(im, isoidx)
-    sp = im.GetSpacing()
-    sp = str2ds(sp)
-    spacing = [sp[i] for i in otheridx]
-    slthickness = sp[isoidx]
+    # direction = get_direction(im, isoidx)
+    # sp = im.GetSpacing()
+    # sp = str2ds(sp)
+    # spacing = [sp[i] for i in otheridx]
+    # slthickness = sp[isoidx]
 
     labstats = sitk.LabelShapeStatisticsImageFilter()
     labstats.Execute(im)
@@ -1740,7 +1748,7 @@ def mk_perframe_functional_group(perlabelstuff, UIDlist):
     lablist = perlabelstuff['labels']
 
     for labelidx in range(len(lablist)):
-        label_id = lablist[labelidx]
+        # label_id = lablist[labelidx]
 
         this_roi = perlabelstuff['rois'][labelidx]
         this_size = this_roi.GetSize()
@@ -1811,6 +1819,10 @@ def find_match_im(labelfile, nidetails):
     was derived from.
     """
     nif = sitk.ReadImage(labelfile, sitk.sitkUInt8)
+    qformname = nif.GetMetaData('qform_code_name')
+    if qformname == 'NIFTI_XFORM_UNKNOWN':
+        raise ValueError(labelfile + ': Unknown qform code - stopping')
+
     spacing = nif.GetSpacing()
     oMatrix = nif.GetDirection()
     imsize = nif.GetSize()
@@ -1928,9 +1940,13 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
 
     # Read in as float and rescale to UInt16, with rescale values
     nif = sitk.ReadImage(niftifile, sitk.sitkUInt8)
+    qformname = nif.GetMetaData('qform_code_name')
+    if qformname == 'NIFTI_XFORM_UNKNOWN':
+        raise ValueError(niftifile + ': Unknown qform code - stopping')
+
     spacing = nif.GetSpacing()
-    oMatrix = nif.GetDirection()
-    imsize = nif.GetSize()
+    # oMatrix = nif.GetDirection()
+    # imsize = nif.GetSize()
 
     if len(spacing) > 3:
         raise ValueError('Higher than 3D nifti file - stopping')
@@ -1941,14 +1957,14 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
         # figure out which plane to write. Aiming for isotropic within plane
         # If image is isotropic, should use minimum number of planes
         isoidx = check_isotropy(nif)
-    except:
+    except ValueError:
         print("Error processing " + niftifile)
         raise
     otheridx = [0, 1, 2]
     otheridx.remove(isoidx)
 
-    modification_time = time.strftime("%H%M%S", time.localtime())
-    modification_date = time.strftime("%Y%m%d", time.localtime())
+    # modification_time = time.strftime("%H%M%S", time.localtime())
+    # modification_date = time.strftime("%Y%m%d", time.localtime())
 
     # Columns of this matrix contain the direction cosines
     # matrix is stored in rows
@@ -1957,7 +1973,7 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
     sp = nif.GetSpacing()
     sp = str2ds(sp)
     spacing = [sp[i] for i in otheridx]
-    slthickness = sp[isoidx]
+    # slthickness = sp[isoidx]
 
     # Load the sample dicom
     # create basics of dicom
@@ -2104,7 +2120,6 @@ def import_tractography_study(origdcm, niftifiles,
     n_dir = [os.path.join(destdir, x) for x in n_cn]
     # paste series number?
 
-
     nidetails = [
         sitk_nifti_to_dicom(niftifile=niftifiles[idx], dicomfile=origdcm,
                             dcmprefix="IM",
@@ -2123,16 +2138,16 @@ def import_tractography_study(origdcm, niftifiles,
         [os.makedirs(x, exist_ok=True) for x in t_dir]
 
         t_dir = [os.path.join(x, "FT_00.dcm") for x in t_dir]
-        
+
         tckdetails = [tck_to_dicom(tckfile=tckfiles[idx],
-                               dicomfile=nidetails[0]['dcmfiles'][0],
-                               outputfile=t_dir[idx],
-                               seriesNum=idx + len(nidetails) + 10,
-                               Description=t_cn[idx],
-                               StudyUID=StudyUID,
-                               UIDlist=nidetails[0]['SOPlist'],
-                               FrameUID=FrameUID) for idx in
-                  range(len(tckfiles))]
+                                   dicomfile=nidetails[0]['dcmfiles'][0],
+                                   outputfile=t_dir[idx],
+                                   seriesNum=idx + len(nidetails) + 10,
+                                   Description=t_cn[idx],
+                                   StudyUID=StudyUID,
+                                   UIDlist=nidetails[0]['SOPlist'],
+                                   FrameUID=FrameUID) for idx in
+                      range(len(tckfiles))]
 
     if labelfiles is not None:
         # now for label images
@@ -2153,7 +2168,7 @@ def import_tractography_study(origdcm, niftifiles,
 
             if nif_index is None:
                 raise RawToLabelImMismatch
-            
+
             sitk_labelnifti_to_dicom(
                 labelfiles[idx],
                 dicomfile=nidetails[nif_index]['dcmfiles'][0],
