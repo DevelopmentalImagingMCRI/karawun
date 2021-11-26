@@ -1,5 +1,7 @@
 # Karawun
 
+[![Build/test status](https://github.com/richardbeare/karawun/workflows/KarawunTesting/badge.svg)](https://github.com/richardbeare/karawun/actions)
+
 ![Brainlab screenshot](Pics/brainlab_screenshot.png)
 
 ![Brainlab objects](Pics/brainlab_objects.png)
