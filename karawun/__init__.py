@@ -13,12 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .karawun import import_tractography_study
-from .karawun import fix_dwi_shell
-from .karawun import append_tractography_study
-from .karawun import append_imaging_study
-from .karawun import brainlab_dcm2tck
-from .karawun import load_trackfile
-from .karawun import save_trackfile
-from .karawun import RawToLabelImMismatch
-from .karawun import MissingUIDList
+from .karawun import import_tractography_study  # noqa: F401
+from .karawun import fix_dwi_shell              # noqa: F401
+from .karawun import append_tractography_study  # noqa: F401
+from .karawun import append_imaging_study       # noqa: F401
+from .karawun import brainlab_dcm2tck           # noqa: F401
+from .karawun import load_trackfile             # noqa: F401
+from .karawun import save_trackfile             # noqa: F401
+from .karawun import RawToLabelImMismatch       # noqa: F401
+from .karawun import MissingUIDList             # noqa: F401
+
+from . import _version
+__version__ = _version.get_versions()['version']
