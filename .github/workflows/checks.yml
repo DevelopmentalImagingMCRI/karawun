@@ -71,9 +71,14 @@ jobs:
       run: |
         python3 setup.py bdist_wheel sdist
     - name: Publish to test
-      uses: pypa/gh-action-pypi-publish@master
+      uses: pypa/gh-action-pypi-publish@release/v1.4.2
       with:
         user: __token__
         password: ${{ secrets.TESTPYPI_API_TOKEN }}
         repository_url: https://test.pypi.org/legacy/
+    - name: Publish to pypi
+      uses: pypa/gh-action-pypi-publish@release/v1.4.2
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
 
