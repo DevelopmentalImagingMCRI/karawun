@@ -20,7 +20,7 @@ setup(
     author_email='richard.beare@mcri.edu.au',
     description=('DICOM image, segmgmentation image and fibre object converter'),
     long_description=(LONG_DESCRIPTION),
-    classifiers=['Programming Language :: Python :: 4',
+    classifiers=['Programming Language :: Python :: 3',
                  'License :: OSI Approved :: Apache Software License',
                  'Operating System :: OS Independent',
                  'Development Status :: 5 - Production/Stable',
