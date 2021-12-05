@@ -48,7 +48,7 @@ jobs:
     steps:
     - run: echo Done!        
   packageupload:
-    if:  ${{ github.event_name == 'release' && github.event.action == 'published' }} 
+    if:  ${{ github.event_name == 'release' && github.event.action == 'published' && github.ref == 'refs/heads/release' }} 
     needs: all_tests_successful
     strategy:
       matrix:
