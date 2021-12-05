@@ -42,6 +42,8 @@ jobs:
     - name: Test with pytest
       run: |
         python -m pytest -s tests/
+    - name: Print branch name
+      run: echo ${{ github.ref }}
   all_tests_successful:
     runs-on: ubuntu-latest
     needs: testmatrix
