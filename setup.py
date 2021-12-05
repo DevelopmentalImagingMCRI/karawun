@@ -15,13 +15,13 @@ setup(
     python_requires='>=3.6',
     package_dir={'karawun': 'karawun'},
     url='',
-    license='',
+    license='Apache License, Version 2.0',
     author='Richard Beare',
     author_email='richard.beare@mcri.edu.au',
     description=('DICOM image, segmgmentation image and fibre object converter'),
     long_description=(LONG_DESCRIPTION),
     install_requires=["numpy>=1.13.0",
                       "pydicom==1.4.2",
-                      "SimpleITK>=1.2.0<=2.0.2"],
+                      "SimpleITK>=1.2.0,<=2.0.2"],
     entry_points={'console_scripts': ['importTractography = karawun.commandline:import_tractography_cl']}
 )
