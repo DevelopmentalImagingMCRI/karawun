@@ -8,7 +8,7 @@
 
 ## Introduction
 
-_Karawun_ converts the results of a diffusion MRI tractography study,
+[_Karawun_](https://DevelopmentalImagingMCRI.github.io/karawun) converts the results of a diffusion MRI tractography study,
 as might be used for surgical planning, to a form that is readable by
 the Brainlab software suite.
 
@@ -41,6 +41,24 @@ _Karawun_ is a python package that can be installed using various
 standard python options. It is recommended that some form of virtual environment
 is used to isolate _karawun_ and its dependencies from other packages. Installation
 with miniconda is illustrated below:
+
+### Pip
+
+```bash
+
+pip install karawun
+
+```
+
+### Conda
+
+```
+conda config --append channels conda-forge --append channels anaconda --append channels SimpleITK
+conda create --name KarawunEnv python=3.8 karawun
+
+```
+
+## Installation from source
 
 ### Miniconda
 
@@ -178,7 +196,45 @@ Shoutouts indicating that you are using _Karawun_ are also appreciated.
 
 _Karawun_ is distributed under the Apache License 2.0
 
+# Developer Notes
+
+Documentation is stored in the `gh-pages-source` branch. A github
+action (BuildGHPages in docpages_action.yaml) builds the html
+documentation using sphinx and force pushes the results to the
+`gh-pages` branch for github to display.
+
+The `master` branch is protected, requiring CI tests to pass and a review
+or admin permission for merging. Testing is performed on pull request to master, release and dev
+branches and push to any branch.
+
+The test matrix is covering python version 3.6, 3.7, 3.8 and 3.9 and
+ubuntu-latest, windows-latest and macos-latest.
+
+## PyPI publication
+
+The master branch should be merged manually with release by an
+administrator, using the command line as follows:
+
+```bash
+git fetch --all
+git checkout release
+git merge --ff-only upstream/master
+git push
+```
+
+A release can then be made via the github interface, including a new
+semantic tag of the form `v0.2.5.2`.
+
+The `release` branch should be chosen as the target for the release,
+and a new tag created.
+
+Publishing a release triggers the action (same as used for pull
+requests etc), but additional steps will be run to publish the package
+on pypi.org.
+
+
 
 # Contributors
 
 Richard Beare, Joseph Yang, Chris Adamson, Andrew Perry.
+ 
