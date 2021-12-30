@@ -14,7 +14,7 @@ setup(
     packages=['karawun'],
     python_requires='>=3.6',
     package_dir={'karawun': 'karawun'},
-    url='',
+    url='https://developmentalimagingmcri.github.io/karawun/',
     license='Apache License, Version 2.0',
     author='Richard Beare',
     author_email='richard.beare@mcri.edu.au',
