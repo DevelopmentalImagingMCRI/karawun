@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Installing Karawun &mdash; Karawun 0.2 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Using Karawun" href="using.html" />
+    <link rel="prev" title="Welcome to Karawun’s documentation!" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> Karawun
+            <img src="_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Installing Karawun</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#conda-based-installation">Conda based installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pip-based-installation">Pip based installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#verifying-your-installation">Verifying your installation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="using.html">Using Karawun</a></li>
+<li class="toctree-l1"><a class="reference internal" href="importing.html">Importing into Brainlab</a></li>
+<li class="toctree-l1"><a class="reference internal" href="screenshots.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dicomtypes.html">DICOM types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="whatitsnot.html">What it doesn’t do</a></li>
+<li class="toctree-l1"><a class="reference internal" href="name.html">Naming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="citing.html">Citing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Karawun</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Installing Karawun</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section class="tex2jax_ignore mathjax_ignore" id="installing-karawun">
+<h1>Installing Karawun<a class="headerlink" href="#installing-karawun" title="Permalink to this headline"></a></h1>
+<p><em>Karawun</em> is python package that can be installed via <em>pip</em> or <em>miniconda</em>.</p>
+<p>We recommend that you install <em>Karawun</em> in a python virtual environment
+to avoid clashes with other packages.</p>
+<p>There are a variety of choices of python virtual environments</p>
+<section id="conda-based-installation">
+<h2>Conda based installation<a class="headerlink" href="#conda-based-installation" title="Permalink to this headline"></a></h2>
+<ol>
+<li><p>Install <a class="reference external" href="https://docs.conda.io/en/latest/miniconda.html">miniconda</a> or <a class="reference external" href="https://www.anaconda.com/products/individual">anaconda</a></p></li>
+<li><p>Add package channels:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda config --append channels conda-forge --append channels anaconda --append channels SimpleITK
+</pre></div>
+</div>
+</li>
+<li><p>Create an environment for <em>Karawun</em>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda create --name KarawunEnv <span class="nv">python</span><span class="o">=</span><span class="m">3</span>.8 karawun
+</pre></div>
+</div>
+</li>
+<li><p>Activate the environment:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda activate KarawunEnv
+</pre></div>
+</div>
+</li>
+<li><p>Test the installation by running the main script:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>importTractography -h
+</pre></div>
+</div>
+<p>This will produce the help information if the installation was successful.</p>
+</li>
+</ol>
+<p>Subsequent uses of karawun only require the <code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">activate</span> <span class="pre">KarawunEnv</span></code> step.</p>
+</section>
+<section id="pip-based-installation">
+<h2>Pip based installation<a class="headerlink" href="#pip-based-installation" title="Permalink to this headline"></a></h2>
+<p><em>Karawun</em> is available via the <a class="reference external" href="https://pypi.org">Python package index</a> and
+can be installed using pip</p>
+<ol>
+<li><p>Create and activate your choice of virtual environment.</p></li>
+<li><p>Install with pip</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install karawun
+</pre></div>
+</div>
+</li>
+<li><p>Test the installation by running the main script:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>importTractography -h
+</pre></div>
+</div>
+<p>This will produce the help information if the installation was successful.</p>
+</li>
+</ol>
+</section>
+<section id="verifying-your-installation">
+<span id="verifying"></span><h2>Verifying your installation<a class="headerlink" href="#verifying-your-installation" title="Permalink to this headline"></a></h2>
+<p>Karawun is tested before packages are distributed. However it is
+recommended that you duplicate these tests locally, as follows:</p>
+<ol class="simple">
+<li><p>Clone the github repository to retrieve the test data (windows users may need to install git separately)</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git clone https://github.com/DevelopmentalImagingMCRI/karawun.git
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>Activate the environment in which Karawun is installed, and install pytest into it. eg.</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda activate KarawunEnv
+pip install pytest
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>Change to the cloned folder</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> karawun
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>Run the tests</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python -m pytest -s tests
+</pre></div>
+</div>
+<p>The final line should read:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="o">==================================================</span> <span class="m">3</span> passed, <span class="m">2</span> skipped in <span class="m">19</span>.35s <span class="o">===================================================</span>
+</pre></div>
+</div>
+<p>Skipped tests were run using custom flags to create the baseline results against
+which new results are compared.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Welcome to Karawun’s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="using.html" class="btn btn-neutral float-right" title="Using Karawun" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Murdoch Childrens Research Institute.
+      <span class="lastupdated">Last updated on Sep 08, 2022.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
