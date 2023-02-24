@@ -737,7 +737,15 @@ def delete_tags(dcm):
      Bits Stored
      High Bit
      Frame of reference
-
+     Number of frames
+     Smallest image pixel value
+     Largest image pixel value
+     Dimension organization - a multiframe stuff - 
+                              lots of per slice details from dicom3 that we don't
+                              want to have repeated lots of times
+     Dimension index sequence
+     Shared functional groups sequence attribute 
+     Per-frame functional group sequence - stuff shared between frames
     :param dcm: the pydicom structure
     :return: modified structure
     """
@@ -752,7 +760,10 @@ def delete_tags(dcm):
               ("0x0008", "0x1070"), ("0x0020", "0x000e"),
               ("0x0020", "0x000d"), ("0x0018", "0x1310"),
               ("0x0028", "0x0101"), ("0x0028", "0x0102"),
-              ("0x0020", "0x0052")]
+              ("0x0020", "0x0052"), ("0x0028", "0x0008"),
+              ("0x0028", "0x0106"), ("0x0028", "0x0107"),
+              ("0x0020", "0x9221"), ("0x0020", "0x9222"),
+              ("0x5200" ,"0x9229"), ("0x5200" ,"0x9230")]
     for i in ignore:
         tg = pydi.tag.Tag(i)
         if tg in dcm:
