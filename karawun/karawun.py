@@ -24,6 +24,11 @@
 import pydicom as pydi
 from pydicom import uid as storage_sopclass
 from pydicom.uid import ExplicitVRLittleEndian
+from pydicom.valuerep import DS
+
+from pydicom.encoders import RLELosslessEncoder
+from pydicom.encaps import encapsulate
+
 import SimpleITK as sitk
 import numpy as np
 import time
@@ -1055,6 +1060,14 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
     RescaleSlope = scalednif_dict['rescaleslope']
     RescaleSlopeDS = str2ds([RescaleSlope])
 
+    # apparently this stuff is only use if pixel intensity
+    # relationship is log.
+    #if RescaleIntercept != 0 :
+    #    print("Alert - non zero intercept from nifti")
+    #    print(RescaleIntercept)
+    #if RescaleSlope != 1 :
+    #    print(RescaleSlope)
+
     SOPlist = list()
     filenames = list()
 
@@ -1077,11 +1090,11 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
         thisslice.ImageType = "DERIVED\\SECONDARY\\OTHER"
         thisslice.SeriesTime = modification_time
         thisslice.SeriesDate = modification_date
-        thisslice.WindowCenter = windowcentre
-        thisslice.WindowWidth = windowwidth
-        thisslice.RescaleIntercept = RescaleInterceptDS
-        thisslice.RescaleSlope = RescaleSlopeDS
-        thisslice.RescaleType = "US"
+        thisslice.WindowCenter = DS(windowcentre, auto_format=True)
+        thisslice.WindowWidth = DS(windowwidth, auto_format=True)
+        #thisslice.RescaleIntercept = RescaleInterceptDS
+        #thisslice.RescaleSlope = RescaleSlopeDS
+        #thisslice.RescaleType = "US"
         thisslice.SmallestImagePixelValue = int(mn)
         thisslice.LargestImagePixelValue = int(mx)
         thisslice.BitsStored = 16
@@ -1110,7 +1123,7 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
         fname = dcmprefix + "_" + format(i, "04") + ".dcm"
         fname = os.path.join(outdir, fname)
         pydi.filewriter.dcmwrite(fname, thisslice,
-                                 enforce_file_format=False)
+                                 enforce_file_format=True)
         SOPlist.append(thisslice.SOPInstanceUID)
         filenames.append(fname)
 
@@ -1143,7 +1156,7 @@ def mk_filemeta_labelobj():
     file_meta = mk_filemeta_streamlines()
     # Segmentation storage - use storage_sopclass
     file_meta.MediaStorageSOPClassUID = '1.2.840.10008.5.1.4.1.1.66.4'
-    file_meta.TransferSyntaxUID = pydi.uid.RLECompressedLosslessSyntaxes
+    file_meta.TransferSyntaxUID = pydi.uid.RLETransferSyntaxes
     return file_meta
 
 # Put the mrtrix file details into content description
@@ -1318,7 +1331,7 @@ def mk_surface_sequence(coords, indexes, chk):
     res.SurfacePointsSequence = pydi.Sequence([pydi.Dataset()])
     sz = np.array([x.shape[1] for x in coords])
 
-    res.SurfacePointsSequence[0].NumberOfSurfacePoints = sz.sum()
+    res.SurfacePointsSequence[0].NumberOfSurfacePoints = int(sz.sum())
 
     combinedpoints = np.concatenate(coords, 1)
     collapsedpoints = combinedpoints.transpose().ravel().astype("<f4")
@@ -1499,13 +1512,13 @@ def tck_to_dicom(tckfile, dicomfile, outputfile, seriesNum=0,
         ContDesc = tck['mrtrix_version'] + ',' + tck[
             'method'] + ",lmax=" + str(tck['lmax'])
     # create basics of dicom
-    dicomtemplate = pydi.dcmread(dicomfile)
+    dicomtemplate = pydi.dcmread(dicomfile, force=True)
     fibredcm = dicom_fibre_skel()
     fibredcm = dicom_patient_stuff(fibredcm, dicomtemplate)
     fibredcm = dicom_date_stamps(fibredcm, tckfile)
     fibredcm.file_meta = mk_filemeta_streamlines()
     #fibredcm.is_little_endian = True
-    fibredcm.is_implicit_VR = False
+    #fibredcm.is_implicit_VR = False
     fibredcm.SOPInstanceUID = \
         fibredcm.file_meta.MediaStorageSOPInstanceUID
     fibredcm.SOPClassUID = fibredcm.file_meta.MediaStorageSOPClassUID
@@ -1533,7 +1546,7 @@ def tck_to_dicom(tckfile, dicomfile, outputfile, seriesNum=0,
     fibredcm.NumberOfSurfaces = len(u)
 
     pydi.filewriter.dcmwrite(outputfile, fibredcm,
-                             enforce_file_format=False)
+                             enforce_file_format=True)
     return fibredcm
 
 
@@ -1797,7 +1810,6 @@ def mk_perframe_functional_group(perlabelstuff, UIDlist):
 
     return(pffgs)
 
-
 def mk_rle_data(perlabelstuff):
     """
     Do the run length encoding and encapsulation of
@@ -1812,7 +1824,6 @@ def mk_rle_data(perlabelstuff):
     otheridx = [0, 1, 2]
     otheridx.remove(isoidx)
     labelframe = list()
-
     for labidx in range(len(perlabelstuff["rois"])):
         roi = perlabelstuff["rois"][labidx]
         sz = roi.GetSize()
@@ -1820,13 +1831,19 @@ def mk_rle_data(perlabelstuff):
             selector = mk_indexing_tuple(slce, isoidx)
             roislice = roi[selector]
             slicedat = sitk.GetArrayFromImage(roislice)
-            rledat = (pydi.pixel_data_handlers.
-                      rle_handler.rle_encode_frame(slicedat))
-
+            rledat = RLELosslessEncoder.encode(
+                slicedat,
+                rows=slicedat.shape[0],
+                columns=slicedat.shape[1],
+                samples_per_pixel=1,
+                bits_allocated=slicedat.dtype.itemsize * 8,
+                bits_stored=slicedat.dtype.itemsize * 8,
+                pixel_representation=0,
+                photometric_interpretation="MONOCHROME2",
+                number_of_frames=1
+            )
             labelframe.append(rledat)
-
-    return(pydi.encaps.encapsulate(labelframe,
-                                   fragments_per_frame=1, has_bot=True))
+    return encapsulate(labelframe, fragments_per_frame=1, has_bot=True)
 
 
 def find_match_im(labelfile, nidetails):
@@ -1992,14 +2009,14 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
 
     # Load the sample dicom
     # create basics of dicom
-    dicomtemplate = pydi.dcmread(dicomfile)
+    dicomtemplate = pydi.dcmread(dicomfile, force=True)
 
     labeldcm = dicom_label_skel()
     labeldcm = dicom_patient_stuff(labeldcm, dicomtemplate)
     labeldcm = dicom_date_stamps(labeldcm, niftifile)
     labeldcm.file_meta = mk_filemeta_labelobj()
     #labeldcm.is_little_endian = True
-    labeldcm.is_implicit_VR = False
+    #labeldcm.is_implicit_VR = False
     labeldcm.SOPInstanceUID = \
         labeldcm.file_meta.MediaStorageSOPInstanceUID
     labeldcm.SOPClassUID = labeldcm.file_meta.MediaStorageSOPClassUID
@@ -2090,7 +2107,7 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
     labeldcm["PixelData"].is_undefined_length = True
 
     pydi.filewriter.dcmwrite(outputfile, labeldcm,
-                             enforce_file_format=False)
+                             enforce_file_format=True)
 
 
 ########################################################################
@@ -2307,7 +2324,7 @@ def fix_dwi_shell(origdcmfolder, desiredB, destdir="./", b0thresh=150):
             NM = "IM" + str(x + 1).zfill(4) + ".dcm"
             NM = os.path.join(dcmoutfolder, NM)
             pydi.filewriter.dcmwrite(NM, dcmlist[x],
-                                     enforce_file_format=False)
+                                     enforce_file_format=True)
 
     def setB(dcm):
         thisB = int(dcm['0019', '100c'].value)
