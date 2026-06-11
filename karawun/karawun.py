@@ -22,7 +22,8 @@
 # Author: Richard Beare
 #
 import pydicom as pydi
-import pydicom._storage_sopclass_uids as storage_sopclass
+from pydicom import uid as storage_sopclass
+from pydicom.uid import ExplicitVRLittleEndian
 import SimpleITK as sitk
 import numpy as np
 import time
@@ -36,6 +37,10 @@ import glob
 from . import ciedicom
 #  Constants that brainlab uses in the streamline files - not sure
 #  if they are important or not
+
+import warnings
+warnings.filterwarnings("error", category=UserWarning, module="pydicom")
+
 
 MyNames = True
 if MyNames:
@@ -698,7 +703,7 @@ def mrt_streamlines(surface):
 
 
 def brainlab_dcm2tck(dcmf, outfile):
-    fb = pydi.read_file(dcmf)
+    fb = pydi.dcmread(dcmf)
     streamlines = [mrt_streamlines(s) for s in fb.SurfaceSequence]
     streamlines = [item for sublist in streamlines for item in sublist]
     tf = np.array([-1, 0, 0, 0, -1, 0, 0, 0, 1])
@@ -837,8 +842,8 @@ def clone_dcm_meta(dcm):
     for k, v in dcm.items():
         newdcm[k] = v
     newdcm.file_meta = mk_file_meta()
-    newdcm.is_little_endian = True
-    newdcm.is_implicit_VR = False
+    #newdcm.is_little_endian = True
+    #newdcm.is_implicit_VR = False
     newdcm.SOPInstanceUID = newdcm.file_meta.MediaStorageSOPInstanceUID
     newdcm.SOPClassUID = newdcm.file_meta.MediaStorageSOPClassUID
     return newdcm
@@ -999,7 +1004,7 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
     otheridx = [0, 1, 2]
     otheridx.remove(isoidx)
     # Load the sample dicom
-    t1d = pydi.read_file(dicomfile)
+    t1d = pydi.dcmread(dicomfile)
 
     modification_time = time.strftime("%H%M%S", time.localtime())
     modification_date = time.strftime("%Y%m%d", time.localtime())
@@ -1105,7 +1110,7 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
         fname = dcmprefix + "_" + format(i, "04") + ".dcm"
         fname = os.path.join(outdir, fname)
         pydi.filewriter.dcmwrite(fname, thisslice,
-                                 write_like_original=False)
+                                 enforce_file_format=False)
         SOPlist.append(thisslice.SOPInstanceUID)
         filenames.append(fname)
 
@@ -1316,9 +1321,8 @@ def mk_surface_sequence(coords, indexes, chk):
     res.SurfacePointsSequence[0].NumberOfSurfacePoints = sz.sum()
 
     combinedpoints = np.concatenate(coords, 1)
-    collapsedpoints = combinedpoints.transpose().ravel()
-    res.SurfacePointsSequence[0].PointCoordinatesData = list(
-        collapsedpoints)
+    collapsedpoints = combinedpoints.transpose().ravel().astype("<f4")
+    res.SurfacePointsSequence[0].PointCoordinatesData = collapsedpoints.tobytes()
 
     # private stuff
     tg_0067_0010 = pydi.tag.Tag(0x0067, 0x0010)
@@ -1327,8 +1331,8 @@ def mk_surface_sequence(coords, indexes, chk):
                                          'Brainlab-S14-SSO')
     # Eventually we should look these values up from an FA/FOD image,
     # but set them constant for now
-    fa = np.array(0.5)
-    fa = list(fa.repeat(sz.sum()))
+    fa = np.array(0.5, dtype="<f4")
+    fa = fa.repeat(sz.sum()).tobytes()
     res.SurfacePointsSequence[0].add_new(tg_0067_1003, 'OF', fa)
     # lines (between points, by index)
     SMPS = pydi.Dataset()
@@ -1441,7 +1445,7 @@ def mk_segment_sequence(description, label, UIDlist, surfaces):
     RSS = [mk_referenced_surface_sequence(idx + 1, UIDlist) for idx in
            range(surfaces)]
     res.ReferencedSurfaceSequence = pydi.Sequence(RSS)
-    res.SurfaceCount = surfaces
+    res.SurfaceCount = int(surfaces)
 
     # Finally, the dodgy private tags that appear essential,
     # but aren't in the documentation
@@ -1495,12 +1499,12 @@ def tck_to_dicom(tckfile, dicomfile, outputfile, seriesNum=0,
         ContDesc = tck['mrtrix_version'] + ',' + tck[
             'method'] + ",lmax=" + str(tck['lmax'])
     # create basics of dicom
-    dicomtemplate = pydi.read_file(dicomfile)
+    dicomtemplate = pydi.dcmread(dicomfile)
     fibredcm = dicom_fibre_skel()
     fibredcm = dicom_patient_stuff(fibredcm, dicomtemplate)
     fibredcm = dicom_date_stamps(fibredcm, tckfile)
     fibredcm.file_meta = mk_filemeta_streamlines()
-    fibredcm.is_little_endian = True
+    #fibredcm.is_little_endian = True
     fibredcm.is_implicit_VR = False
     fibredcm.SOPInstanceUID = \
         fibredcm.file_meta.MediaStorageSOPInstanceUID
@@ -1529,7 +1533,7 @@ def tck_to_dicom(tckfile, dicomfile, outputfile, seriesNum=0,
     fibredcm.NumberOfSurfaces = len(u)
 
     pydi.filewriter.dcmwrite(outputfile, fibredcm,
-                             write_like_original=False)
+                             enforce_file_format=False)
     return fibredcm
 
 
@@ -1988,13 +1992,13 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
 
     # Load the sample dicom
     # create basics of dicom
-    dicomtemplate = pydi.read_file(dicomfile)
+    dicomtemplate = pydi.dcmread(dicomfile)
 
     labeldcm = dicom_label_skel()
     labeldcm = dicom_patient_stuff(labeldcm, dicomtemplate)
     labeldcm = dicom_date_stamps(labeldcm, niftifile)
     labeldcm.file_meta = mk_filemeta_labelobj()
-    labeldcm.is_little_endian = True
+    #labeldcm.is_little_endian = True
     labeldcm.is_implicit_VR = False
     labeldcm.SOPInstanceUID = \
         labeldcm.file_meta.MediaStorageSOPInstanceUID
@@ -2086,7 +2090,7 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
     labeldcm["PixelData"].is_undefined_length = True
 
     pydi.filewriter.dcmwrite(outputfile, labeldcm,
-                             write_like_original=False)
+                             enforce_file_format=False)
 
 
 ########################################################################
@@ -2207,7 +2211,7 @@ def get_already_converted_info(origdcmfolder):
     dcms = [os.path.join(origdcmfolder, f) for f in dcms]
 
     def dcdetails(f):
-        db = pydi.read_file(f)
+        db = pydi.dcmread(f)
         return {'FrameUID': db.FrameOfReferenceUID,
                 'StudyUID': db.StudyInstanceUID,
                 'SeriesUID': db.SeriesInstanceUID,
@@ -2303,7 +2307,7 @@ def fix_dwi_shell(origdcmfolder, desiredB, destdir="./", b0thresh=150):
             NM = "IM" + str(x + 1).zfill(4) + ".dcm"
             NM = os.path.join(dcmoutfolder, NM)
             pydi.filewriter.dcmwrite(NM, dcmlist[x],
-                                     write_like_original=False)
+                                     enforce_file_format=False)
 
     def setB(dcm):
         thisB = int(dcm['0019', '100c'].value)
@@ -2323,7 +2327,7 @@ def fix_dwi_shell(origdcmfolder, desiredB, destdir="./", b0thresh=150):
 
     fls = glob.glob(os.path.join(origdcmfolder, "*.dcm"))
     fls.sort()
-    dd = [pydi.read_file(x) for x in fls]
+    dd = [pydi.dcmread(x) for x in fls]
     bv = [setB(x) for x in dd]
     # Need to change the IDs so that there's no clash
     # with existing data
