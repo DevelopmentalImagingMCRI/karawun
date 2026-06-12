@@ -24,7 +24,7 @@
 import pydicom as pydi
 from pydicom import uid as storage_sopclass
 from pydicom.uid import ExplicitVRLittleEndian
-from pydicom.valuerep import DS
+from pydicom.valuerep import DS, DSfloat
 
 from pydicom.encoders import RLELosslessEncoder
 from pydicom.encaps import encapsulate
@@ -1092,9 +1092,12 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
         thisslice.SeriesDate = modification_date
         thisslice.WindowCenter = DS(windowcentre, auto_format=True)
         thisslice.WindowWidth = DS(windowwidth, auto_format=True)
-        #thisslice.RescaleIntercept = RescaleInterceptDS
-        #thisslice.RescaleSlope = RescaleSlopeDS
-        #thisslice.RescaleType = "US"
+        # Rescaling is only valid for MR modality when the 
+        # Pixel intensity relationship is log
+        # strange stuff happens in brainlab if these aren't present
+        thisslice.RescaleIntercept = RescaleInterceptDS
+        thisslice.RescaleSlope = RescaleSlopeDS
+        thisslice.RescaleType = "US"
         thisslice.SmallestImagePixelValue = int(mn)
         thisslice.LargestImagePixelValue = int(mx)
         thisslice.BitsStored = 16
