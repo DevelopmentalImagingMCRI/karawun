@@ -27,6 +27,7 @@ from pydicom.uid import ExplicitVRLittleEndian
 from pydicom.valuerep import DS, DSfloat
 
 from pydicom.encoders import RLELosslessEncoder
+#from pydicom.pixels import RLELosslessEncoder
 from pydicom.encaps import encapsulate
 
 import SimpleITK as sitk
@@ -1834,6 +1835,7 @@ def mk_rle_data(perlabelstuff):
             selector = mk_indexing_tuple(slce, isoidx)
             roislice = roi[selector]
             slicedat = sitk.GetArrayFromImage(roislice)
+            slicedat = (slicedat > 0).astype(np.uint8) * 255
             rledat = RLELosslessEncoder.encode(
                 slicedat,
                 rows=slicedat.shape[0],
@@ -1921,6 +1923,7 @@ def mk_label_segment_sequence(imname, labs):
         seg1.SegmentAlgorithmType = 'AUTOMATIC'
         seg1.SegmentAlgorithmName = 'Unknown'
         seg1.RecommendedDisplayCIELabValue = lookup_cie(labs[labnum])
+        #seg1.RecommendedDisplayCIELabValue = lookup_cie(1)
         # Segmented Property Type Code Sequence
         segmented_property_type_code_sequence = pydi.Sequence()
         seg1.SegmentedPropertyTypeCodeSequence = (
@@ -2052,6 +2055,7 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
 
     totalframes = count_total_frames(perlabelstuff, isoidx)
     labeldcm.NumberOfFrames = totalframes
+
     labeldcm.Rows = int(cropsize[otheridx[1]])
     labeldcm.Columns = int(cropsize[otheridx[0]])
     labeldcm.BitsAllocated = 8
