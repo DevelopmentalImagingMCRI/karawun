@@ -44,8 +44,8 @@ from . import ciedicom
 #  Constants that brainlab uses in the streamline files - not sure
 #  if they are important or not
 
-import warnings
-warnings.filterwarnings("error", category=UserWarning, module="pydicom")
+#import warnings
+#warnings.filterwarnings("error", category=UserWarning, module="pydicom")
 
 
 MyNames = True
@@ -1793,7 +1793,7 @@ def mk_perframe_functional_group(perlabelstuff, UIDlist):
             origin = thiscropped.TransformIndexToPhysicalPoint(corner)
             fcs = pydi.Sequence()
             fc1 = pydi.Dataset()
-            fc1.DimensionIndexValues = [labelidx + 1, thisslice + 1]
+            fc1.DimensionIndexValues = [isoidx + 1, thisslice + 1]
             fcs.append(fc1)
             pps = pydi.Sequence()
             pp1 = pydi.Dataset()
