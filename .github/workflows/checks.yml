@@ -17,8 +17,8 @@ jobs:
   testmatrix:
     strategy:
       matrix:
-        os: [ubuntu-18.04, macos-darwin, windows-latest]
-        python: [3.6, 3.7, 3.8, 3.9]
+        os: [ubuntu-22.04, ubuntun-24.04, macos-13, macos-14, macos-latest, windows-latest]
+        python: [3.14]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -54,7 +54,7 @@ jobs:
     needs: all_tests_successful
     strategy:
       matrix:
-        python: [3.6]
+        python: [3.14]
     runs-on: ubuntu-latest
 
     steps:
