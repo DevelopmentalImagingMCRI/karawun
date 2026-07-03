@@ -210,6 +210,24 @@ branches and push to any branch.
 The test matrix is covering python version 3.6, 3.7, 3.8 and 3.9 and
 ubuntu-latest, windows-latest and macos-latest.
 
+## Creating new "baseline SHAs"
+
+The tests compare hashes of newly generated dicoms to previously generated and saved
+hashes. Sometime the output dicoms are expected to change due to, for
+example, improved enforcing of standards by pydicom. The hashes are generated using the test
+framework as follows:
+
+### list tests and available markers
+```
+python -m pytest -s tests/ --collect-only
+python -m pytest -s tests/ --markers
+```
+
+### Run baseline creation
+```
+python -m pytest -s tests/ -m createbaseline
+```
+
 ## PyPI publication
 
 The master branch should be merged manually with release by an
