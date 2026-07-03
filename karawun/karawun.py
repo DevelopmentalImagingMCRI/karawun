@@ -1554,7 +1554,6 @@ def tck_to_dicom(tckfile, dicomfile, outputfile, seriesNum=0,
 
 
 def lookup_cie(labnum):
-    global nice_colours_cie
     if labnum > (len(nice_colours_cie) - 1):
         labnum = len(nice_colours_cie) - 1
         print("Error - too many labels")
