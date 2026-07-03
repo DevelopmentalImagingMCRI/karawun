@@ -26,8 +26,7 @@ from pydicom import uid as storage_sopclass
 from pydicom.uid import ExplicitVRLittleEndian
 from pydicom.valuerep import DS, DSfloat
 
-from pydicom.encoders import RLELosslessEncoder
-#from pydicom.pixels import RLELosslessEncoder
+from pydicom.pixels.encoders import RLELosslessEncoder
 from pydicom.encaps import encapsulate
 
 import SimpleITK as sitk
