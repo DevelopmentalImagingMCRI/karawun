@@ -29,7 +29,7 @@ setup(
                  'Intended Audience :: Science/Research',
                  'Natural Language :: English',
                  'Topic :: Scientific/Engineering :: Medical Science Apps.'
-        ],
+                 ],
     install_requires=["numpy>=2.3",
                       "pydicom==3.0.2",
                       "SimpleITK>=2.5.5"],

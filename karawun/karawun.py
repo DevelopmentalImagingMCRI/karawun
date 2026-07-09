@@ -180,6 +180,98 @@ def structstrings_get_datatype(letter, endian):
     return signedPart + datatypePart + endianPart
 
 
+def init_trackstruct():
+    trackStruct = dict()
+    trackStruct['init_threshold'] = None
+    trackStruct['lmax'] = None
+    trackStruct['max_dist'] = None
+    trackStruct['max_num_attempts'] = None
+    trackStruct['max_num_tracks'] = None
+    trackStruct['max_trials'] = None
+    trackStruct['method'] = None
+    trackStruct['min_curv'] = None
+    trackStruct['min_dist'] = None
+    trackStruct['no_mask_interp'] = None
+    trackStruct['sh_precomputed'] = None
+    trackStruct['source'] = None
+    trackStruct['step_size'] = None
+    trackStruct['stop_when_included'] = None
+    trackStruct['threshold'] = None
+    trackStruct['unidirectional'] = None
+    trackStruct['mrtrix_version'] = None
+    trackStruct['roi'] = dict()
+    trackStruct['roi']['type'] = list()
+    trackStruct['roi']['file'] = list()
+    trackStruct['datatype'] = None
+    trackStruct['count'] = None
+    trackStruct['total_count'] = None
+    trackStruct['tracks'] = list()
+    return trackStruct
+
+
+def fill_trackstruct(FID, trackStruct):
+    pat = re.compile('^([a-z_]+): (.*)$')
+
+    while True:
+        curLine = FID.readline().decode().rstrip()
+        if curLine == "END":
+            break
+        else:
+            mat = pat.match(curLine)
+            if mat is not None:
+
+                curKeyword = mat.group(1)
+                curValue = mat.group(2)
+
+                if curKeyword in ['init_threshold', 'max_dist',
+                                  'min_curv', 'min_dist',
+                                  'step_size', 'threshold']:
+                    try:
+                        trackStruct[curKeyword] = float(curValue)
+                    except ValueError:
+                        trackStruct[curKeyword] = curValue
+                elif curKeyword in ['lmax', 'max_num_attempts',
+                                    'max_num_tracks',
+                                    'max_trials',
+                                    'no_mask_interp',
+                                    'sh_precomputed',
+                                    'threshold',
+                                    'count',
+                                    'unidirectional',
+                                    'stop_when_included',
+                                    'total_count']:
+                    try:
+                        trackStruct[curKeyword] = int(curValue)
+                    except ValueError:
+                        trackStruct[curKeyword] = curValue
+                elif curKeyword in ['method', 'source',
+                                    'mrtrix_version']:
+                    trackStruct[curKeyword] = curValue[:]
+                elif curKeyword == 'datatype':
+                    trackStruct['datatype'] = dict()
+                    (
+                        trackStruct['datatype']['letter'],
+                        trackStruct['datatype']['endian'],
+                        trackStruct['datatype']['size']
+                    ) = datatype_get_struct_strings(curValue)
+                elif curKeyword == 'roi':
+                    roimat = re.match(r'(\S+)\s+(\S+)', curValue)
+                    if roimat is not None:
+                        trackStruct['roi']['type']. \
+                            append(roimat.group(1))
+                        trackStruct['roi']['file']. \
+                            append(roimat.group(2))
+                    del roimat
+                elif curKeyword == 'file':
+                    trackStruct['file'] = curValue[:]
+                    filemat = re.match(r'\.\s+(\d+)', curValue)
+                    if filemat is not None:
+                        trackStruct['dataoffset'] = \
+                            int(filemat.group(1))
+                    del filemat
+    return trackStruct
+
+
 def load_trackfile(fileName, origVectorMode=False):
     """
     Read an mrtrix .tck file
@@ -234,92 +326,8 @@ def load_trackfile(fileName, origVectorMode=False):
             return None
         else:
             del firstLine
-
-            trackStruct = dict()
-
-            trackStruct['init_threshold'] = None
-            trackStruct['lmax'] = None
-            trackStruct['max_dist'] = None
-            trackStruct['max_num_attempts'] = None
-            trackStruct['max_num_tracks'] = None
-            trackStruct['max_trials'] = None
-            trackStruct['method'] = None
-            trackStruct['min_curv'] = None
-            trackStruct['min_dist'] = None
-            trackStruct['no_mask_interp'] = None
-            trackStruct['sh_precomputed'] = None
-            trackStruct['source'] = None
-            trackStruct['step_size'] = None
-            trackStruct['stop_when_included'] = None
-            trackStruct['threshold'] = None
-            trackStruct['unidirectional'] = None
-            trackStruct['mrtrix_version'] = None
-            trackStruct['roi'] = dict()
-            trackStruct['roi']['type'] = list()
-            trackStruct['roi']['file'] = list()
-            trackStruct['datatype'] = None
-            trackStruct['count'] = None
-            trackStruct['total_count'] = None
-            trackStruct['tracks'] = list()
-            pat = re.compile('^([a-z_]+): (.*)$')
-
-            while True:
-                curLine = FID.readline().decode().rstrip()
-                if curLine == "END":
-                    break
-                else:
-                    mat = pat.match(curLine)
-                    if mat is not None:
-
-                        curKeyword = mat.group(1)
-                        curValue = mat.group(2)
-
-                        if curKeyword in ['init_threshold', 'max_dist',
-                                          'min_curv', 'min_dist',
-                                          'step_size', 'threshold']:
-                            try:
-                                trackStruct[curKeyword] = float(curValue)
-                            except ValueError:
-                                trackStruct[curKeyword] = curValue
-                        elif curKeyword in ['lmax', 'max_num_attempts',
-                                            'max_num_tracks',
-                                            'max_trials',
-                                            'no_mask_interp',
-                                            'sh_precomputed',
-                                            'threshold',
-                                            'count',
-                                            'unidirectional',
-                                            'stop_when_included',
-                                            'total_count']:
-                            try:
-                                trackStruct[curKeyword] = int(curValue)
-                            except ValueError:
-                                trackStruct[curKeyword] = curValue
-                        elif curKeyword in ['method', 'source',
-                                            'mrtrix_version']:
-                            trackStruct[curKeyword] = curValue[:]
-                        elif curKeyword == 'datatype':
-                            trackStruct['datatype'] = dict()
-                            (
-                                trackStruct['datatype']['letter'],
-                                trackStruct['datatype']['endian'],
-                                trackStruct['datatype']['size']
-                            ) = datatype_get_struct_strings(curValue)
-                        elif curKeyword == 'roi':
-                            roimat = re.match(r'(\S+)\s+(\S+)', curValue)
-                            if roimat is not None:
-                                trackStruct['roi']['type']. \
-                                    append(roimat.group(1))
-                                trackStruct['roi']['file']. \
-                                    append(roimat.group(2))
-                            del roimat
-                        elif curKeyword == 'file':
-                            trackStruct['file'] = curValue[:]
-                            filemat = re.match(r'\.\s+(\d+)', curValue)
-                            if filemat is not None:
-                                trackStruct['dataoffset'] = \
-                                    int(filemat.group(1))
-                            del filemat
+            trackStruct = init_trackstruct()
+            trackStruct = fill_trackstruct(FID, trackStruct)
         # if firstLine != 'mrtrix tracks':
         if trackStruct['datatype'] is not None:
             FID.seek(0, 2)  # 2 means the end of the file
