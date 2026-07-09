@@ -17,14 +17,14 @@ jobs:
   testmatrix:
     strategy:
       matrix:
-        os: [ubuntu-22.04, ubuntun-24.04, macos-13, macos-14, macos-latest, windows-latest]
+        os: [ubuntu-22.04, ubuntun-24.04, macos-14, macos-latest, windows-latest]
         python: [3.14]
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v6
       with:
         python-version: "${{ matrix.python }}"
     - name: Install dependencies
@@ -58,9 +58,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v6
       with:
         python-version: "${{ matrix.python }}"
     - name: Install dependencies
