@@ -17,7 +17,7 @@ jobs:
   testmatrix:
     strategy:
       matrix:
-        os: [ubuntu-22.04, ubuntun-24.04, macos-14, macos-latest, windows-latest]
+        os: [ubuntu-22.04, ubuntu-24.04, macos-14, macos-latest, windows-latest]
         python: [3.14]
     runs-on: ${{ matrix.os }}
 
