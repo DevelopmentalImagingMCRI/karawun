@@ -23,8 +23,7 @@
 #
 import pydicom as pydi
 from pydicom import uid as storage_sopclass
-from pydicom.uid import ExplicitVRLittleEndian
-from pydicom.valuerep import DS, DSfloat
+from pydicom.valuerep import DS
 
 from pydicom.pixels.encoders import RLELosslessEncoder
 from pydicom.encaps import encapsulate
@@ -42,10 +41,6 @@ import glob
 from . import ciedicom
 #  Constants that brainlab uses in the streamline files - not sure
 #  if they are important or not
-
-#import warnings
-#warnings.filterwarnings("error", category=UserWarning, module="pydicom")
-
 
 MyNames = True
 if MyNames:
@@ -750,11 +745,11 @@ def delete_tags(dcm):
      Number of frames
      Smallest image pixel value
      Largest image pixel value
-     Dimension organization - a multiframe stuff - 
-                              lots of per slice details from dicom3 that we don't
-                              want to have repeated lots of times
+     Dimension organization - a multiframe stuff -
+                lots of per slice details from dicom3 that we don't
+                want to have repeated lots of times
      Dimension index sequence
-     Shared functional groups sequence attribute 
+     Shared functional groups sequence attribute
      Per-frame functional group sequence - stuff shared between frames
     :param dcm: the pydicom structure
     :return: modified structure
@@ -773,7 +768,7 @@ def delete_tags(dcm):
               ("0x0020", "0x0052"), ("0x0028", "0x0008"),
               ("0x0028", "0x0106"), ("0x0028", "0x0107"),
               ("0x0020", "0x9221"), ("0x0020", "0x9222"),
-              ("0x5200" ,"0x9229"), ("0x5200" ,"0x9230")]
+              ("0x5200", "0x9229"), ("0x5200", "0x9230")]
     for i in ignore:
         tg = pydi.tag.Tag(i)
         if tg in dcm:
@@ -847,8 +842,6 @@ def clone_dcm_meta(dcm):
     for k, v in dcm.items():
         newdcm[k] = v
     newdcm.file_meta = mk_file_meta()
-    #newdcm.is_little_endian = True
-    #newdcm.is_implicit_VR = False
     newdcm.SOPInstanceUID = newdcm.file_meta.MediaStorageSOPInstanceUID
     newdcm.SOPClassUID = newdcm.file_meta.MediaStorageSOPClassUID
     return newdcm
@@ -906,7 +899,9 @@ def check_isotropy(sitkImage):
     # round to 6 decimal
     spu = np.unique(np.around(sparray, 6))
     if np.unique(spu).ravel().shape[0] == 3:
-        message = 'No plane with isotropic voxels - stopping - {},{},{}'.format(sparray[0], sparray[1], sparray[2])
+        message = "No plane with isotropic voxels -" \
+                  " stopping - {},{},{}".\
+                  format(sparray[0], sparray[1], sparray[2])
         raise ValueError(message)
 
     sparray = np.around(sparray, 6)
@@ -935,11 +930,11 @@ def get_direction(sitkImage, planeidx):
 
 def mk_indexing_tuple(index, plane):
     if plane == 2:
-        return((slice(None), slice(None), index))
+        return (slice(None), slice(None), index)
     if plane == 1:
-        return((slice(None), index, slice(None)))
+        return (slice(None), index, slice(None))
     if plane == 0:
-        return((index, slice(None), slice(None)))
+        return (index, slice(None), slice(None))
 
     raise ValueError("Invalid plane number")
 
@@ -990,7 +985,7 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
     qformname = nif.GetMetaData('qform_code_name')
     if qformname == 'NIFTI_XFORM_UNKNOWN':
         raise ValueError(niftifile + ': Unknown qform code - stopping')
-    
+
     spacing = nif.GetSpacing()
     oMatrix = nif.GetDirection()
     imsize = nif.GetSize()
@@ -1060,14 +1055,6 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
     RescaleSlope = scalednif_dict['rescaleslope']
     RescaleSlopeDS = str2ds([RescaleSlope])
 
-    # apparently this stuff is only use if pixel intensity
-    # relationship is log.
-    #if RescaleIntercept != 0 :
-    #    print("Alert - non zero intercept from nifti")
-    #    print(RescaleIntercept)
-    #if RescaleSlope != 1 :
-    #    print(RescaleSlope)
-
     SOPlist = list()
     filenames = list()
 
@@ -1092,7 +1079,7 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
         thisslice.SeriesDate = modification_date
         thisslice.WindowCenter = DS(windowcentre, auto_format=True)
         thisslice.WindowWidth = DS(windowwidth, auto_format=True)
-        # Rescaling is only valid for MR modality when the 
+        # Rescaling is only valid for MR modality when the
         # Pixel intensity relationship is log
         # strange stuff happens in brainlab if these aren't present
         thisslice.RescaleIntercept = RescaleInterceptDS
@@ -1338,7 +1325,8 @@ def mk_surface_sequence(coords, indexes, chk):
 
     combinedpoints = np.concatenate(coords, 1)
     collapsedpoints = combinedpoints.transpose().ravel().astype("<f4")
-    res.SurfacePointsSequence[0].PointCoordinatesData = collapsedpoints.tobytes()
+    res.SurfacePointsSequence[0].PointCoordinatesData = \
+        collapsedpoints.tobytes()
 
     # private stuff
     tg_0067_0010 = pydi.tag.Tag(0x0067, 0x0010)
@@ -1520,8 +1508,6 @@ def tck_to_dicom(tckfile, dicomfile, outputfile, seriesNum=0,
     fibredcm = dicom_patient_stuff(fibredcm, dicomtemplate)
     fibredcm = dicom_date_stamps(fibredcm, tckfile)
     fibredcm.file_meta = mk_filemeta_streamlines()
-    #fibredcm.is_little_endian = True
-    #fibredcm.is_implicit_VR = False
     fibredcm.SOPInstanceUID = \
         fibredcm.file_meta.MediaStorageSOPInstanceUID
     fibredcm.SOPClassUID = fibredcm.file_meta.MediaStorageSOPClassUID
@@ -1600,10 +1586,10 @@ def process_label_im(im):
                                  newcorners[i]) == labels[i]
            for i in range(len(labels))]
 
-    return({'rois': ims, 'labels': labels,
+    return {'rois': ims, 'labels': labels,
             'corners': corners,
             'sizes': sizes,
-            'original': im})
+            'original': im}
 
 
 def count_total_frames(perlabelstuff, isoidx):
@@ -1685,8 +1671,8 @@ def process_label_imA(im):
                                  lowcorner) == labels[i]
            for i in range(len(labels))]
     imcrop = sitk.RegionOfInterest(im, allsize, lowcorner)
-    return({'rois': ims, 'labels': labels,
-            'original': im, 'cropped': imcrop})
+    return {'rois': ims, 'labels': labels,
+            'original': im, 'cropped': imcrop}
 
 
 def mk_shared_functional_group(nif, SOPList):
@@ -1755,7 +1741,7 @@ def mk_shared_functional_group(nif, SOPList):
     sfg1.PlaneOrientationSequence = pos
     sfg1.PixelMeasuresSequence = pms
     sfgs.append(sfg1)
-    return(sfgs)
+    return sfgs
 
 
 def mk_perframe_functional_group(perlabelstuff, UIDlist):
@@ -1810,7 +1796,8 @@ def mk_perframe_functional_group(perlabelstuff, UIDlist):
             pffg1.SegmentIdentificationSequence = sis
             pffgs.append(pffg1)
 
-    return(pffgs)
+    return pffgs
+
 
 def mk_rle_data(perlabelstuff):
     """
@@ -1921,7 +1908,6 @@ def mk_label_segment_sequence(imname, labs):
         seg1.SegmentAlgorithmType = 'AUTOMATIC'
         seg1.SegmentAlgorithmName = 'Unknown'
         seg1.RecommendedDisplayCIELabValue = lookup_cie(labs[labnum])
-        #seg1.RecommendedDisplayCIELabValue = lookup_cie(1)
         # Segmented Property Type Code Sequence
         segmented_property_type_code_sequence = pydi.Sequence()
         seg1.SegmentedPropertyTypeCodeSequence = (
@@ -2019,8 +2005,6 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
     labeldcm = dicom_patient_stuff(labeldcm, dicomtemplate)
     labeldcm = dicom_date_stamps(labeldcm, niftifile)
     labeldcm.file_meta = mk_filemeta_labelobj()
-    #labeldcm.is_little_endian = True
-    #labeldcm.is_implicit_VR = False
     labeldcm.SOPInstanceUID = \
         labeldcm.file_meta.MediaStorageSOPInstanceUID
     labeldcm.SOPClassUID = labeldcm.file_meta.MediaStorageSOPClassUID
@@ -2176,15 +2160,15 @@ def import_tractography_study(origdcm, niftifiles,
 
         t_dir = [os.path.join(x, "FT_00.dcm") for x in t_dir]
 
-        tckdetails = [tck_to_dicom(tckfile=tckfiles[idx],
-                                   dicomfile=nidetails[0]['dcmfiles'][0],
-                                   outputfile=t_dir[idx],
-                                   seriesNum=idx + len(nidetails) + 10,
-                                   Description=t_cn[idx],
-                                   StudyUID=StudyUID,
-                                   UIDlist=nidetails[0]['SOPlist'],
-                                   FrameUID=FrameUID) for idx in
-                      range(len(tckfiles))]
+        [tck_to_dicom(tckfile=tckfiles[idx],
+                      dicomfile=nidetails[0]['dcmfiles'][0],
+                      outputfile=t_dir[idx],
+                      seriesNum=idx + len(nidetails) + 10,
+                      Description=t_cn[idx],
+                      StudyUID=StudyUID,
+                      UIDlist=nidetails[0]['SOPlist'],
+                      FrameUID=FrameUID) for idx in
+            range(len(tckfiles))]
 
     if labelfiles is not None:
         # now for label images
@@ -2275,6 +2259,7 @@ def append_imaging_study(origdcmfolder, niftifiles, studystart,
                             StudyUID=StudyUID, FrameUID=FrameUID,
                             SeriesNum=idx + studystart) for idx in
         range(len(niftifiles))]
+    return nidetails
 
 
 def append_tractography_study(origdcmfolder, tckfiles, destdir="./"):
