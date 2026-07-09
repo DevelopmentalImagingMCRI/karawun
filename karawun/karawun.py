@@ -205,6 +205,8 @@ def init_trackstruct():
     trackStruct['datatype'] = None
     trackStruct['count'] = None
     trackStruct['total_count'] = None
+    trackStruct['command_history'] = None
+    trackStruct['timestamp'] = None
     trackStruct['tracks'] = list()
     return trackStruct
 
@@ -245,7 +247,9 @@ def fill_trackstruct(FID, trackStruct):
                     except ValueError:
                         trackStruct[curKeyword] = curValue
                 elif curKeyword in ['method', 'source',
-                                    'mrtrix_version']:
+                                    'mrtrix_version',
+                                    'command_history',
+                                    'timestamp']:
                     trackStruct[curKeyword] = curValue[:]
                 elif curKeyword == 'datatype':
                     trackStruct['datatype'] = dict()
@@ -1507,7 +1511,11 @@ def tck_to_dicom(tckfile, dicomfile, outputfile, seriesNum=0,
 
     # make some description strings for content description
     ContDesc = 'mrtrix'
-    if tck['mrtrix_version'] is not None:
+    if (
+        tck['mrtrix_version'] is not None
+        and tck['method'] is not None
+        and tck['lmax'] is not None
+    ):
         ContDesc = tck['mrtrix_version'] + ',' + tck[
             'method'] + ",lmax=" + str(tck['lmax'])
     # create basics of dicom
