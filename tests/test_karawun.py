@@ -75,7 +75,7 @@ def get_all_sha512(location):
             z = zip(relfiles, shalist)
             shadict.update(dict(z))
 
-    return(shadict)
+    return shadict
 
 
 # test routines
@@ -148,7 +148,7 @@ def test_conv1(dcm_uuid, localtime, tmp_path):
         os.path.dirname(os.path.abspath(__file__)), 'Baseline',
         "image_sha512.json")
 
-    assert os.path.exists(baselineshaf),\
+    assert os.path.exists(baselineshaf), \
         ("Missing json file - run pytest --runcreatebaseline"
          "-k 'not test_conv1'")
     print("Destination folder = " + str(tmp_path))
@@ -157,7 +157,7 @@ def test_conv1(dcm_uuid, localtime, tmp_path):
     f = open(baselineshaf)
     baselinesha = json.loads(f.read())
     f.close()
-    assert(baselinesha == this_sha512)
+    assert baselinesha == this_sha512
 
 
 @mock.patch('time.localtime', side_effect=patchLocalTime)
@@ -167,7 +167,7 @@ def test_conv2(dcm_uuid, localtime, tmp_path):
         os.path.dirname(os.path.abspath(__file__)), 'Baseline',
         "seg_sha512.json")
 
-    assert os.path.exists(baselineshaf),\
+    assert os.path.exists(baselineshaf), \
         ("Missing json file - run pytest --runcreatebaseline"
          "-k 'not test_conv1'")
     print("Destination folder = " + str(tmp_path))
@@ -176,7 +176,7 @@ def test_conv2(dcm_uuid, localtime, tmp_path):
     f = open(baselineshaf)
     baselinesha = json.loads(f.read())
     f.close()
-    assert(baselinesha == this_sha512)
+    assert baselinesha == this_sha512
 
 
 def test_conv3(tmp_path):

@@ -22,7 +22,12 @@
 # Author: Richard Beare
 #
 import pydicom as pydi
-import pydicom._storage_sopclass_uids as storage_sopclass
+from pydicom import uid as storage_sopclass
+from pydicom.valuerep import DS
+
+from pydicom.pixels.encoders import RLELosslessEncoder
+from pydicom.encaps import encapsulate
+
 import SimpleITK as sitk
 import numpy as np
 import time
@@ -175,6 +180,102 @@ def structstrings_get_datatype(letter, endian):
     return signedPart + datatypePart + endianPart
 
 
+def init_trackstruct():
+    trackStruct = dict()
+    trackStruct['init_threshold'] = None
+    trackStruct['lmax'] = None
+    trackStruct['max_dist'] = None
+    trackStruct['max_num_attempts'] = None
+    trackStruct['max_num_tracks'] = None
+    trackStruct['max_trials'] = None
+    trackStruct['method'] = None
+    trackStruct['min_curv'] = None
+    trackStruct['min_dist'] = None
+    trackStruct['no_mask_interp'] = None
+    trackStruct['sh_precomputed'] = None
+    trackStruct['source'] = None
+    trackStruct['step_size'] = None
+    trackStruct['stop_when_included'] = None
+    trackStruct['threshold'] = None
+    trackStruct['unidirectional'] = None
+    trackStruct['mrtrix_version'] = None
+    trackStruct['roi'] = dict()
+    trackStruct['roi']['type'] = list()
+    trackStruct['roi']['file'] = list()
+    trackStruct['datatype'] = None
+    trackStruct['count'] = None
+    trackStruct['total_count'] = None
+    trackStruct['command_history'] = None
+    trackStruct['timestamp'] = None
+    trackStruct['tracks'] = list()
+    return trackStruct
+
+
+def fill_trackstruct(FID, trackStruct):
+    pat = re.compile('^([a-z_]+): (.*)$')
+
+    while True:
+        curLine = FID.readline().decode().rstrip()
+        if curLine == "END":
+            break
+        else:
+            mat = pat.match(curLine)
+            if mat is not None:
+
+                curKeyword = mat.group(1)
+                curValue = mat.group(2)
+
+                if curKeyword in ['init_threshold', 'max_dist',
+                                  'min_curv', 'min_dist',
+                                  'step_size', 'threshold']:
+                    try:
+                        trackStruct[curKeyword] = float(curValue)
+                    except ValueError:
+                        trackStruct[curKeyword] = curValue
+                elif curKeyword in ['lmax', 'max_num_attempts',
+                                    'max_num_tracks',
+                                    'max_trials',
+                                    'no_mask_interp',
+                                    'sh_precomputed',
+                                    'threshold',
+                                    'count',
+                                    'unidirectional',
+                                    'stop_when_included',
+                                    'total_count']:
+                    try:
+                        trackStruct[curKeyword] = int(curValue)
+                    except ValueError:
+                        trackStruct[curKeyword] = curValue
+                elif curKeyword in ['method', 'source',
+                                    'mrtrix_version',
+                                    'command_history',
+                                    'timestamp']:
+                    trackStruct[curKeyword] = curValue[:]
+                elif curKeyword == 'datatype':
+                    trackStruct['datatype'] = dict()
+                    (
+                        trackStruct['datatype']['letter'],
+                        trackStruct['datatype']['endian'],
+                        trackStruct['datatype']['size']
+                    ) = datatype_get_struct_strings(curValue)
+                elif curKeyword == 'roi':
+                    roimat = re.match(r'(\S+)\s+(\S+)', curValue)
+                    if roimat is not None:
+                        trackStruct['roi']['type']. \
+                            append(roimat.group(1))
+                        trackStruct['roi']['file']. \
+                            append(roimat.group(2))
+                    del roimat
+                elif curKeyword == 'file':
+                    trackStruct['file'] = curValue[:]
+                    filemat = re.match(r'\.\s+(\d+)', curValue)
+                    if filemat is not None:
+                        trackStruct['dataoffset'] = \
+                            int(filemat.group(1))
+                    del filemat
+    return trackStruct
+
+
 def load_trackfile(fileName, origVectorMode=False):
     """
     Read an mrtrix .tck file
@@ -229,92 +330,8 @@ def load_trackfile(fileName, origVectorMode=False):
             return None
         else:
             del firstLine
-
-            trackStruct = dict()
-
-            trackStruct['init_threshold'] = None
-            trackStruct['lmax'] = None
-            trackStruct['max_dist'] = None
-            trackStruct['max_num_attempts'] = None
-            trackStruct['max_num_tracks'] = None
-            trackStruct['max_trials'] = None
-            trackStruct['method'] = None
-            trackStruct['min_curv'] = None
-            trackStruct['min_dist'] = None
-            trackStruct['no_mask_interp'] = None
-            trackStruct['sh_precomputed'] = None
-            trackStruct['source'] = None
-            trackStruct['step_size'] = None
-            trackStruct['stop_when_included'] = None
-            trackStruct['threshold'] = None
-            trackStruct['unidirectional'] = None
-            trackStruct['mrtrix_version'] = None
-            trackStruct['roi'] = dict()
-            trackStruct['roi']['type'] = list()
-            trackStruct['roi']['file'] = list()
-            trackStruct['datatype'] = None
-            trackStruct['count'] = None
-            trackStruct['total_count'] = None
-            trackStruct['tracks'] = list()
-            pat = re.compile('^([a-z_]+): (.*)$')
-
-            while True:
-                curLine = FID.readline().decode().rstrip()
-                if curLine == "END":
-                    break
-                else:
-                    mat = pat.match(curLine)
-                    if mat is not None:
-
-                        curKeyword = mat.group(1)
-                        curValue = mat.group(2)
-
-                        if curKeyword in ['init_threshold', 'max_dist',
-                                          'min_curv', 'min_dist',
-                                          'step_size', 'threshold']:
-                            try:
-                                trackStruct[curKeyword] = float(curValue)
-                            except ValueError:
-                                trackStruct[curKeyword] = curValue
-                        elif curKeyword in ['lmax', 'max_num_attempts',
-                                            'max_num_tracks',
-                                            'max_trials',
-                                            'no_mask_interp',
-                                            'sh_precomputed',
-                                            'threshold',
-                                            'count',
-                                            'unidirectional',
-                                            'stop_when_included',
-                                            'total_count']:
-                            try:
-                                trackStruct[curKeyword] = int(curValue)
-                            except ValueError:
-                                trackStruct[curKeyword] = curValue
-                        elif curKeyword in ['method', 'source',
-                                            'mrtrix_version']:
-                            trackStruct[curKeyword] = curValue[:]
-                        elif curKeyword == 'datatype':
-                            trackStruct['datatype'] = dict()
-                            (
-                                trackStruct['datatype']['letter'],
-                                trackStruct['datatype']['endian'],
-                                trackStruct['datatype']['size']
-                            ) = datatype_get_struct_strings(curValue)
-                        elif curKeyword == 'roi':
-                            roimat = re.match(r'(\S+)\s+(\S+)', curValue)
-                            if roimat is not None:
-                                trackStruct['roi']['type']. \
-                                    append(roimat.group(1))
-                                trackStruct['roi']['file']. \
-                                    append(roimat.group(2))
-                            del roimat
-                        elif curKeyword == 'file':
-                            trackStruct['file'] = curValue[:]
-                            filemat = re.match(r'\.\s+(\d+)', curValue)
-                            if filemat is not None:
-                                trackStruct['dataoffset'] = \
-                                    int(filemat.group(1))
-                            del filemat
+            trackStruct = init_trackstruct()
+            trackStruct = fill_trackstruct(FID, trackStruct)
         # if firstLine != 'mrtrix tracks':
         if trackStruct['datatype'] is not None:
             FID.seek(0, 2)  # 2 means the end of the file
@@ -698,7 +715,7 @@ def mrt_streamlines(surface):
 
 
 def brainlab_dcm2tck(dcmf, outfile):
-    fb = pydi.read_file(dcmf)
+    fb = pydi.dcmread(dcmf)
     streamlines = [mrt_streamlines(s) for s in fb.SurfaceSequence]
     streamlines = [item for sublist in streamlines for item in sublist]
     tf = np.array([-1, 0, 0, 0, -1, 0, 0, 0, 1])
@@ -737,7 +754,15 @@ def delete_tags(dcm):
      Bits Stored
      High Bit
      Frame of reference
-
+     Number of frames
+     Smallest image pixel value
+     Largest image pixel value
+     Dimension organization - a multiframe stuff -
+                lots of per slice details from dicom3 that we don't
+                want to have repeated lots of times
+     Dimension index sequence
+     Shared functional groups sequence attribute
+     Per-frame functional group sequence - stuff shared between frames
     :param dcm: the pydicom structure
     :return: modified structure
     """
@@ -752,7 +777,10 @@ def delete_tags(dcm):
               ("0x0008", "0x1070"), ("0x0020", "0x000e"),
               ("0x0020", "0x000d"), ("0x0018", "0x1310"),
               ("0x0028", "0x0101"), ("0x0028", "0x0102"),
-              ("0x0020", "0x0052")]
+              ("0x0020", "0x0052"), ("0x0028", "0x0008"),
+              ("0x0028", "0x0106"), ("0x0028", "0x0107"),
+              ("0x0020", "0x9221"), ("0x0020", "0x9222"),
+              ("0x5200", "0x9229"), ("0x5200", "0x9230")]
     for i in ignore:
         tg = pydi.tag.Tag(i)
         if tg in dcm:
@@ -826,8 +854,6 @@ def clone_dcm_meta(dcm):
     for k, v in dcm.items():
         newdcm[k] = v
     newdcm.file_meta = mk_file_meta()
-    newdcm.is_little_endian = True
-    newdcm.is_implicit_VR = False
     newdcm.SOPInstanceUID = newdcm.file_meta.MediaStorageSOPInstanceUID
     newdcm.SOPClassUID = newdcm.file_meta.MediaStorageSOPClassUID
     return newdcm
@@ -885,7 +911,9 @@ def check_isotropy(sitkImage):
     # round to 6 decimal
     spu = np.unique(np.around(sparray, 6))
     if np.unique(spu).ravel().shape[0] == 3:
-        message = 'No plane with isotropic voxels - stopping - {},{},{}'.format(sparray[0], sparray[1], sparray[2])
+        message = "No plane with isotropic voxels -" \
+                  " stopping - {},{},{}".\
+                  format(sparray[0], sparray[1], sparray[2])
         raise ValueError(message)
 
     sparray = np.around(sparray, 6)
@@ -914,11 +942,11 @@ def get_direction(sitkImage, planeidx):
 
 def mk_indexing_tuple(index, plane):
     if plane == 2:
-        return((slice(None), slice(None), index))
+        return (slice(None), slice(None), index)
     if plane == 1:
-        return((slice(None), index, slice(None)))
+        return (slice(None), index, slice(None))
     if plane == 0:
-        return((index, slice(None), slice(None)))
+        return (index, slice(None), slice(None))
 
     raise ValueError("Invalid plane number")
 
@@ -969,7 +997,7 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
     qformname = nif.GetMetaData('qform_code_name')
     if qformname == 'NIFTI_XFORM_UNKNOWN':
         raise ValueError(niftifile + ': Unknown qform code - stopping')
-    
+
     spacing = nif.GetSpacing()
     oMatrix = nif.GetDirection()
     imsize = nif.GetSize()
@@ -988,7 +1016,7 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
     otheridx = [0, 1, 2]
     otheridx.remove(isoidx)
     # Load the sample dicom
-    t1d = pydi.read_file(dicomfile)
+    t1d = pydi.dcmread(dicomfile)
 
     modification_time = time.strftime("%H%M%S", time.localtime())
     modification_date = time.strftime("%Y%m%d", time.localtime())
@@ -1061,8 +1089,11 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
         thisslice.ImageType = "DERIVED\\SECONDARY\\OTHER"
         thisslice.SeriesTime = modification_time
         thisslice.SeriesDate = modification_date
-        thisslice.WindowCenter = windowcentre
-        thisslice.WindowWidth = windowwidth
+        thisslice.WindowCenter = DS(windowcentre, auto_format=True)
+        thisslice.WindowWidth = DS(windowwidth, auto_format=True)
+        # Rescaling is only valid for MR modality when the
+        # Pixel intensity relationship is log
+        # strange stuff happens in brainlab if these aren't present
         thisslice.RescaleIntercept = RescaleInterceptDS
         thisslice.RescaleSlope = RescaleSlopeDS
         thisslice.RescaleType = "US"
@@ -1094,7 +1125,7 @@ def sitk_nifti_to_dicom(niftifile, dicomfile, dcmprefix, outdir,
         fname = dcmprefix + "_" + format(i, "04") + ".dcm"
         fname = os.path.join(outdir, fname)
         pydi.filewriter.dcmwrite(fname, thisslice,
-                                 write_like_original=False)
+                                 enforce_file_format=True)
         SOPlist.append(thisslice.SOPInstanceUID)
         filenames.append(fname)
 
@@ -1127,7 +1158,7 @@ def mk_filemeta_labelobj():
     file_meta = mk_filemeta_streamlines()
     # Segmentation storage - use storage_sopclass
     file_meta.MediaStorageSOPClassUID = '1.2.840.10008.5.1.4.1.1.66.4'
-    file_meta.TransferSyntaxUID = pydi.uid.RLECompressedLosslessSyntaxes
+    file_meta.TransferSyntaxUID = pydi.uid.RLETransferSyntaxes
     return file_meta
 
 # Put the mrtrix file details into content description
@@ -1302,12 +1333,12 @@ def mk_surface_sequence(coords, indexes, chk):
     res.SurfacePointsSequence = pydi.Sequence([pydi.Dataset()])
     sz = np.array([x.shape[1] for x in coords])
 
-    res.SurfacePointsSequence[0].NumberOfSurfacePoints = sz.sum()
+    res.SurfacePointsSequence[0].NumberOfSurfacePoints = int(sz.sum())
 
     combinedpoints = np.concatenate(coords, 1)
-    collapsedpoints = combinedpoints.transpose().ravel()
-    res.SurfacePointsSequence[0].PointCoordinatesData = list(
-        collapsedpoints)
+    collapsedpoints = combinedpoints.transpose().ravel().astype("<f4")
+    res.SurfacePointsSequence[0].PointCoordinatesData = \
+        collapsedpoints.tobytes()
 
     # private stuff
     tg_0067_0010 = pydi.tag.Tag(0x0067, 0x0010)
@@ -1316,8 +1347,8 @@ def mk_surface_sequence(coords, indexes, chk):
                                          'Brainlab-S14-SSO')
     # Eventually we should look these values up from an FA/FOD image,
     # but set them constant for now
-    fa = np.array(0.5)
-    fa = list(fa.repeat(sz.sum()))
+    fa = np.array(0.5, dtype="<f4")
+    fa = fa.repeat(sz.sum()).tobytes()
     res.SurfacePointsSequence[0].add_new(tg_0067_1003, 'OF', fa)
     # lines (between points, by index)
     SMPS = pydi.Dataset()
@@ -1430,7 +1461,7 @@ def mk_segment_sequence(description, label, UIDlist, surfaces):
     RSS = [mk_referenced_surface_sequence(idx + 1, UIDlist) for idx in
            range(surfaces)]
     res.ReferencedSurfaceSequence = pydi.Sequence(RSS)
-    res.SurfaceCount = surfaces
+    res.SurfaceCount = int(surfaces)
 
     # Finally, the dodgy private tags that appear essential,
     # but aren't in the documentation
@@ -1480,17 +1511,19 @@ def tck_to_dicom(tckfile, dicomfile, outputfile, seriesNum=0,
 
     # make some description strings for content description
     ContDesc = 'mrtrix'
-    if tck['mrtrix_version'] is not None:
+    if (
+        tck['mrtrix_version'] is not None
+        and tck['method'] is not None
+        and tck['lmax'] is not None
+    ):
         ContDesc = tck['mrtrix_version'] + ',' + tck[
             'method'] + ",lmax=" + str(tck['lmax'])
     # create basics of dicom
-    dicomtemplate = pydi.read_file(dicomfile)
+    dicomtemplate = pydi.dcmread(dicomfile, force=True)
     fibredcm = dicom_fibre_skel()
     fibredcm = dicom_patient_stuff(fibredcm, dicomtemplate)
     fibredcm = dicom_date_stamps(fibredcm, tckfile)
     fibredcm.file_meta = mk_filemeta_streamlines()
-    fibredcm.is_little_endian = True
-    fibredcm.is_implicit_VR = False
     fibredcm.SOPInstanceUID = \
         fibredcm.file_meta.MediaStorageSOPInstanceUID
     fibredcm.SOPClassUID = fibredcm.file_meta.MediaStorageSOPClassUID
@@ -1518,12 +1551,11 @@ def tck_to_dicom(tckfile, dicomfile, outputfile, seriesNum=0,
     fibredcm.NumberOfSurfaces = len(u)
 
     pydi.filewriter.dcmwrite(outputfile, fibredcm,
-                             write_like_original=False)
+                             enforce_file_format=True)
     return fibredcm
 
 
 def lookup_cie(labnum):
-    global nice_colours_cie
     if labnum > (len(nice_colours_cie) - 1):
         labnum = len(nice_colours_cie) - 1
         print("Error - too many labels")
@@ -1570,10 +1602,10 @@ def process_label_im(im):
                                  newcorners[i]) == labels[i]
            for i in range(len(labels))]
 
-    return({'rois': ims, 'labels': labels,
+    return {'rois': ims, 'labels': labels,
             'corners': corners,
             'sizes': sizes,
-            'original': im})
+            'original': im}
 
 
 def count_total_frames(perlabelstuff, isoidx):
@@ -1655,8 +1687,8 @@ def process_label_imA(im):
                                  lowcorner) == labels[i]
            for i in range(len(labels))]
     imcrop = sitk.RegionOfInterest(im, allsize, lowcorner)
-    return({'rois': ims, 'labels': labels,
-            'original': im, 'cropped': imcrop})
+    return {'rois': ims, 'labels': labels,
+            'original': im, 'cropped': imcrop}
 
 
 def mk_shared_functional_group(nif, SOPList):
@@ -1725,7 +1757,7 @@ def mk_shared_functional_group(nif, SOPList):
     sfg1.PlaneOrientationSequence = pos
     sfg1.PixelMeasuresSequence = pms
     sfgs.append(sfg1)
-    return(sfgs)
+    return sfgs
 
 
 def mk_perframe_functional_group(perlabelstuff, UIDlist):
@@ -1761,7 +1793,7 @@ def mk_perframe_functional_group(perlabelstuff, UIDlist):
             origin = thiscropped.TransformIndexToPhysicalPoint(corner)
             fcs = pydi.Sequence()
             fc1 = pydi.Dataset()
-            fc1.DimensionIndexValues = [labelidx + 1, thisslice + 1]
+            fc1.DimensionIndexValues = [isoidx + 1, thisslice + 1]
             fcs.append(fc1)
             pps = pydi.Sequence()
             pp1 = pydi.Dataset()
@@ -1780,7 +1812,7 @@ def mk_perframe_functional_group(perlabelstuff, UIDlist):
             pffg1.SegmentIdentificationSequence = sis
             pffgs.append(pffg1)
 
-    return(pffgs)
+    return pffgs
 
 
 def mk_rle_data(perlabelstuff):
@@ -1797,7 +1829,6 @@ def mk_rle_data(perlabelstuff):
     otheridx = [0, 1, 2]
     otheridx.remove(isoidx)
     labelframe = list()
-
     for labidx in range(len(perlabelstuff["rois"])):
         roi = perlabelstuff["rois"][labidx]
         sz = roi.GetSize()
@@ -1805,13 +1836,20 @@ def mk_rle_data(perlabelstuff):
             selector = mk_indexing_tuple(slce, isoidx)
             roislice = roi[selector]
             slicedat = sitk.GetArrayFromImage(roislice)
-            rledat = (pydi.pixel_data_handlers.
-                      rle_handler.rle_encode_frame(slicedat))
-
+            slicedat = (slicedat > 0).astype(np.uint8) * 255
+            rledat = RLELosslessEncoder.encode(
+                slicedat,
+                rows=slicedat.shape[0],
+                columns=slicedat.shape[1],
+                samples_per_pixel=1,
+                bits_allocated=slicedat.dtype.itemsize * 8,
+                bits_stored=slicedat.dtype.itemsize * 8,
+                pixel_representation=0,
+                photometric_interpretation="MONOCHROME2",
+                number_of_frames=1
+            )
             labelframe.append(rledat)
-
-    return(pydi.encaps.encapsulate(labelframe,
-                                   fragments_per_frame=1, has_bot=True))
+    return encapsulate(labelframe, fragments_per_frame=1, has_bot=True)
 
 
 def find_match_im(labelfile, nidetails):
@@ -1977,14 +2015,12 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
 
     # Load the sample dicom
     # create basics of dicom
-    dicomtemplate = pydi.read_file(dicomfile)
+    dicomtemplate = pydi.dcmread(dicomfile, force=True)
 
     labeldcm = dicom_label_skel()
     labeldcm = dicom_patient_stuff(labeldcm, dicomtemplate)
     labeldcm = dicom_date_stamps(labeldcm, niftifile)
     labeldcm.file_meta = mk_filemeta_labelobj()
-    labeldcm.is_little_endian = True
-    labeldcm.is_implicit_VR = False
     labeldcm.SOPInstanceUID = \
         labeldcm.file_meta.MediaStorageSOPInstanceUID
     labeldcm.SOPClassUID = labeldcm.file_meta.MediaStorageSOPClassUID
@@ -2017,6 +2053,7 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
 
     totalframes = count_total_frames(perlabelstuff, isoidx)
     labeldcm.NumberOfFrames = totalframes
+
     labeldcm.Rows = int(cropsize[otheridx[1]])
     labeldcm.Columns = int(cropsize[otheridx[0]])
     labeldcm.BitsAllocated = 8
@@ -2075,7 +2112,7 @@ def sitk_labelnifti_to_dicom(niftifile, dicomfile,
     labeldcm["PixelData"].is_undefined_length = True
 
     pydi.filewriter.dcmwrite(outputfile, labeldcm,
-                             write_like_original=False)
+                             enforce_file_format=True)
 
 
 ########################################################################
@@ -2139,15 +2176,15 @@ def import_tractography_study(origdcm, niftifiles,
 
         t_dir = [os.path.join(x, "FT_00.dcm") for x in t_dir]
 
-        tckdetails = [tck_to_dicom(tckfile=tckfiles[idx],
-                                   dicomfile=nidetails[0]['dcmfiles'][0],
-                                   outputfile=t_dir[idx],
-                                   seriesNum=idx + len(nidetails) + 10,
-                                   Description=t_cn[idx],
-                                   StudyUID=StudyUID,
-                                   UIDlist=nidetails[0]['SOPlist'],
-                                   FrameUID=FrameUID) for idx in
-                      range(len(tckfiles))]
+        [tck_to_dicom(tckfile=tckfiles[idx],
+                      dicomfile=nidetails[0]['dcmfiles'][0],
+                      outputfile=t_dir[idx],
+                      seriesNum=idx + len(nidetails) + 10,
+                      Description=t_cn[idx],
+                      StudyUID=StudyUID,
+                      UIDlist=nidetails[0]['SOPlist'],
+                      FrameUID=FrameUID) for idx in
+            range(len(tckfiles))]
 
     if labelfiles is not None:
         # now for label images
@@ -2196,7 +2233,7 @@ def get_already_converted_info(origdcmfolder):
     dcms = [os.path.join(origdcmfolder, f) for f in dcms]
 
     def dcdetails(f):
-        db = pydi.read_file(f)
+        db = pydi.dcmread(f)
         return {'FrameUID': db.FrameOfReferenceUID,
                 'StudyUID': db.StudyInstanceUID,
                 'SeriesUID': db.SeriesInstanceUID,
@@ -2238,6 +2275,7 @@ def append_imaging_study(origdcmfolder, niftifiles, studystart,
                             StudyUID=StudyUID, FrameUID=FrameUID,
                             SeriesNum=idx + studystart) for idx in
         range(len(niftifiles))]
+    return nidetails
 
 
 def append_tractography_study(origdcmfolder, tckfiles, destdir="./"):
@@ -2292,7 +2330,7 @@ def fix_dwi_shell(origdcmfolder, desiredB, destdir="./", b0thresh=150):
             NM = "IM" + str(x + 1).zfill(4) + ".dcm"
             NM = os.path.join(dcmoutfolder, NM)
             pydi.filewriter.dcmwrite(NM, dcmlist[x],
-                                     write_like_original=False)
+                                     enforce_file_format=True)
 
     def setB(dcm):
         thisB = int(dcm['0019', '100c'].value)
@@ -2312,7 +2350,7 @@ def fix_dwi_shell(origdcmfolder, desiredB, destdir="./", b0thresh=150):
 
     fls = glob.glob(os.path.join(origdcmfolder, "*.dcm"))
     fls.sort()
-    dd = [pydi.read_file(x) for x in fls]
+    dd = [pydi.dcmread(x) for x in fls]
     bv = [setB(x) for x in dd]
     # Need to change the IDs so that there's no clash
     # with existing data

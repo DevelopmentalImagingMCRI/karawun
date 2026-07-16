@@ -12,7 +12,7 @@ setup(
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     packages=['karawun'],
-    python_requires='>=3.6',
+    python_requires='>=3.14',
     package_dir={'karawun': 'karawun'},
     url='https://developmentalimagingmcri.github.io/karawun/',
     license='Apache License, Version 2.0',
@@ -29,9 +29,9 @@ setup(
                  'Intended Audience :: Science/Research',
                  'Natural Language :: English',
                  'Topic :: Scientific/Engineering :: Medical Science Apps.'
-        ],
-    install_requires=["numpy>=1.13.0",
-                      "pydicom==1.4.2",
-                      "SimpleITK>=1.2.0,<=2.0.2"],
+                 ],
+    install_requires=["numpy>=2.3",
+                      "pydicom==3.0.2",
+                      "SimpleITK>=2.5.5"],
     entry_points={'console_scripts': ['importTractography = karawun.commandline:import_tractography_cl']}
 )

@@ -31,19 +31,21 @@ def is_readable_file(parser, arg):
         f = open(arg, 'r')
         f.close()
     except Exception:
-        raise argparse.ArgumentTypeError("{0} does not exist or is not readable".format(arg))
+        raise argparse.ArgumentTypeError(
+            "{0} does not exist or is not readable".format(arg))
+    return arg
 
-    return(arg)
 
-
-parser = argparse.ArgumentParser(description="A tool for creating Brainlab compatible dicom data from "
-                                             "mrtrix tract files and nifti images. All image and tck"
-                                             "files are assumed to be aligned and will be placed into"
-                                             "a dicom frame of reference with the first nifti image"
-                                             "as the base for the reference. The alignment must be"
-                                             "accepted in brainlab before objects can be viewed on"
-                                             "all images.")
-
+parser = argparse.ArgumentParser(
+    description=(
+        "A tool for creating Brainlab compatible dicom data from "
+        "mrtrix tract files and nifti images. All image and tck"
+        "files are assumed to be aligned and will be placed into"
+        "a dicom frame of reference with the first nifti image"
+        "as the base for the reference. The alignment must be"
+        "accepted in brainlab before objects can be viewed on"
+        "all images.")
+)
 parser.add_argument("-d", "--dicom-template",
                     type=lambda x: is_readable_file(parser, x),
                     required=True,
@@ -82,9 +84,11 @@ def run_cli(args):
                                           labelfiles=args.label_files,
                                           destdir=args.output_dir)
     except karawun.RawToLabelImMismatch:
-        print("One of the label images is not derived from any of the raw images")
+        print("One of the label images is not "
+              "derived from any of the raw images")
     except karawun.MissingUIDList:
-        print("A UID list is required iternally somewhere - this error shouldn't happen")
+        print("A UID list is required iternally somewhere -"
+              " this error shouldn't happen")
 
 
 def import_tractography_cl():
