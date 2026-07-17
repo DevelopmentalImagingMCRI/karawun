@@ -12,6 +12,17 @@ on:
       - dev
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Where to publish'
+        required: true
+        default: 'testpypi'
+        type: choice
+        options:
+          - testpypi
+          - pypi
+          - both  
 
 jobs:
   testmatrix:
@@ -59,6 +70,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0   # versioneer needs full history/tags to compute the version
     - name: Set up Python
       uses: actions/setup-python@v6
       with:
@@ -67,19 +80,19 @@ jobs:
       run: |
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade build
-        python3 -m pip install --upgrade versioneer
-        python3 -m pip install --upgrade wheel        
     - name: Build package
       run: |
-        python3 setup.py bdist_wheel sdist
+        python3 -m build
     - name: Publish to test
-      uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+      if: ${{ github.event_name == 'release' || github.event.inputs.target == 'testpypi' || github.event.inputs.target == 'both' }}
+      uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
       with:
         user: __token__
         password: ${{ secrets.TESTPYPI_API_TOKEN }}
         repository_url: https://test.pypi.org/legacy/
     - name: Publish to pypi
-      uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+      if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'pypi' || github.event.inputs.target == 'both') }}
+      uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
       with:
         user: __token__
         password: ${{ secrets.PYPI_API_TOKEN }}
