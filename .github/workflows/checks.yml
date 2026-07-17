@@ -21,6 +21,7 @@ on:
         type: choice
         options:
           - testpypi
+          - pypi
 
 jobs:
   testmatrix:
@@ -81,15 +82,8 @@ jobs:
     - name: Build package
       run: |
         python3 -m build
-    - name: Publish to test
-      if: ${{ github.event_name == 'release' || github.event.inputs.target == 'testpypi' || github.event.inputs.target == 'both' }}
-      uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
-      with:
-        user: __token__
-        password: ${{ secrets.TESTPYPI_API_TOKEN }}
-        repository-url: https://test.pypi.org/legacy/
     - name: Publish to pypi
-      if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'pypi' || github.event.inputs.target == 'both') }}
+      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'pypi' }}
       uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
       with:
         user: __token__
