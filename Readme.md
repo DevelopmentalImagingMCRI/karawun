@@ -230,6 +230,17 @@ python -m pytest -s tests/ -m createbaseline
 
 ## PyPI publication
 
+### Testing releases
+There are manually triggerable workflows that include the ability
+to push to testpypi. These come from the "run workflow" dropdown and will need to
+have a tag set in the "use workflow from" option, otherwise the
+generated version number won't conform.
+
+Once the testpypi option is working the auto release can be
+triggered as below.
+
+### Auto releases
+
 The master branch should be merged manually with release by an
 administrator, using the command line as follows:
 

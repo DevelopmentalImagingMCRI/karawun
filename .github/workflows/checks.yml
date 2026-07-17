@@ -83,27 +83,18 @@ jobs:
       run: |
         python3 -m build
     - name: Publish to pypi
-      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'pypi' }}
       uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
       with:
         user: __token__
         password: ${{ secrets.PYPI_API_TOKEN }}
-    - name: Publish to test
-      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'testpypi' }}
-      uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
-      with:
-        user: __token__
-        password: ${{ secrets.TESTPYPI_API_TOKEN }}
-        repository-url: https://test.pypi.org/legacy/
 
-  packageuploadtest: # this will fail because the tag to set the version number won't conform to standards
+  packageuploadtest: # this will fail unless a tag is chosen for the source of the workflow.
     if:  ${{ github.event_name == 'workflow_dispatch' }} 
     needs: all_tests_successful
     strategy:
       matrix:
         python: [3.14]
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v6
       with:
@@ -119,6 +110,12 @@ jobs:
     - name: Build package
       run: |
         python3 -m build
+    - name: Publish to pypi
+      if: ${{ github.event.inputs.target == 'pypi' }}
+      uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
     - name: Publish to test
       if: ${{ github.event.inputs.target == 'testpypi' }}
       uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
